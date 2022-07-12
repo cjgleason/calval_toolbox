@@ -1,0 +1,8 @@
+CPT27_20210911.csv --> example PT data
+GNSS_drift_key.csv --> example GNSS drift key by file name and date and reach of river
+LOG6_LP_2420.csv --> example post-processed GNSS file from CSRS 
+PT_UTM.csv --> example key for offsets at each PT and which GNSS file was used during install
+
+lid_clip_PT.R
+lid_GNSSatPTlocs.R ---> Had many R files to help manipulate data, I think this was the most complete? 
+			Both files are more for reference at my thought process
