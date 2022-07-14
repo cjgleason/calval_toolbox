@@ -1,11 +1,12 @@
 correct_PT_to_GNSS= function(raw_PT_file,PT_key_file,dist_thresh,time_thresh,PT_data_directory,
                              GNSS_drift_data_directory,QA_QC_PT_output_directory, flagged_PT_directory,
-                             change_thresh_15_min,change_thresh_static,GNSS_sd_thresh,offset_diff_thresh){
+                             change_thresh_15_min,GNSS_sd_thresh,offset_diff_thresh){
   
   library(dplyr)
   library(tidyr)
   library(fuzzyjoin)
   library(geodist)
+  library(bayesbio)
   filename=sub("\\..*","",raw_PT_file)
   
   handle_raw_PT=function(raw_PT_file,PT_key_fil,PT_data_directory,GNSS_drift_data_directory){
@@ -121,7 +122,9 @@ correct_PT_to_GNSS= function(raw_PT_file,PT_key_file,dist_thresh,time_thresh,PT_
   offset=offset_PT%>%
     group_by(days)%>%
     select(days,offset,sd_GNSS,sd_PT)%>%
-    summarize(offset=unique(offset),sd_GNSS=unique(sd_GNSS),sd_PT=unique(sd_PT))
+    summarize(offset=unique(offset),sd_GNSS=unique(sd_GNSS),sd_PT=unique(sd_PT))%>%
+    ungroup()%>%
+    mutate(datetime=as.POSIXct(paste0(days,'12:00:00'),format='%m%d%Y%H:%M:%S'))
   
   #now check the offset for a few tricks
   
@@ -146,17 +149,12 @@ correct_PT_to_GNSS= function(raw_PT_file,PT_key_file,dist_thresh,time_thresh,PT_
     return(NA)
   }}
   
-  
+
   #apply the offset to the original (unjoined) PT data
-  final_PT = prepped_PT %>%
-    mutate(days=format(datetime,format='%m%d%Y'))%>%
-    left_join(offset,by='days')%>%
-    group_by(days)%>%
-    mutate(corrected_level= LEVEL+offset)
-  
-
-  
-
+  #use the closest offset in time
+  #bayesbio has a nice nearest time join!
+  final_PT = nearestTime(prepped_PT,offset,'datetime','datetime') %>%
+    mutate(corrected_level= LEVEL+offset-GNSS_offset) #add the PT level and the correction, and then subtract the GNSS distance from the H2O
 
 
 #now, check for discontinuities in the PT data. A common discontinuity is at the beginning or end. 

@@ -13,9 +13,8 @@ time_thresh= 15*60 #minutes as seconds, centered, so 15 =30 mins total time
 GNSS_sd_thresh=0.15 # 15cm how much variance do you want in the GNSS data when it is within the distance threshold?
 change_thresh_15_min= 0.20 #m, so 20cm. This checks for a time-on-time change in flow of more than xxxcm to check for suddent shifts in the PT.
 #typically, these occur during put in and takeout as suddent shifts while it is deployed are rare. 
-change_thresh_static= 0.06 #m, so 5cm. how much does the PT change after the shift?
-change_thresh_offset= 0.25 #m, so xxx cm. This looks at the first and last offsets claculated from the data to ensure they are the same
 offset_diff_thresh=0.01 #m, so 1cm. the the PT apparantly shift by more than a cm?
+
 # munge PTs if needed------
 #check for un-munged PT data
 #pull filename before the .csv
@@ -43,15 +42,17 @@ source('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox
   dummy=lapply(unmunged_PTs,correct_PT_to_GNSS,PT_key_file=PT_key_file,dist_thresh=dist_thresh,
          time_thresh=time_thresh,PT_data_directory=PT_data_directory,GNSS_drift_data_directory=GNSS_drift_data_directory,
          QA_QC_PT_output_directory=QA_QC_PT_output_directory,flagged_PT_directory=flagged_PT_directory,
-         change_thresh_15_min=change_thresh_15_min,change_thresh_static=change_thresh_static,GNSS_sd_thresh,offset_diff_thresh)
+         change_thresh_15_min=change_thresh_15_min,GNSS_sd_thresh,offset_diff_thresh)
   }
 #-----------------------------
 
-#correct for time of GNSS
+#correct drifts to PTs-----
+#TODO
+#--------------------------
 
 
-# notborked=readRDS(paste0(QA_QC_PT_output_directory,list.files(QA_QC_PT_output_directory)[6]))
-# plot(notborked$datetime,notborked$offset_level)
+ notborked=readRDS(paste0(QA_QC_PT_output_directory,list.files(QA_QC_PT_output_directory)[15]))
+ plot(notborked$datetime,notborked$offset_level)
 
 
 
