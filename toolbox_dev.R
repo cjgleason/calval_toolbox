@@ -49,18 +49,15 @@ source('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox
 
 #correct drifts to PTs-----
 drift_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/drifts/'
+PT_key_file='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/PT drift key.csv'
+PT_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/QAQC PTs/'
+max_PT_to_drift= 2.00 #km,  
+SWOT_time= as.POSIXct('2021-09-02 23:04:37') # a dummy value far away from the drift
 
-setwd(drift_directory)
-drift_in=read.csv(list.files(drift_directory)[1],header = TRUE)
-
-
+#warning! no output is saved yet. 
+source('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/R code/ajdust_drift_via_PT.R')
+test=adjust_drift_via_PT(drift_directory,PT_key_file,PT_directory,max_PT_to_drift,SWOT_time)
 #--------------------------
-
-
- notborked=readRDS(paste0(QA_QC_PT_output_directory,list.files(QA_QC_PT_output_directory)[15]))
- plot(notborked$datetime,notborked$offset_level)
-
-
 
 
 

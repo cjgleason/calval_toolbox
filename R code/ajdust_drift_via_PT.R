@@ -1,8 +1,10 @@
-drift_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/drifts/'
-PT_key_file='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/PT drift key.csv'
-PT_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/QAQC PTs/'
-max_PT_to_drift= 2.00 #km,  
-SWOT_time= as.POSIXct('2021-09-02 23:04:37') # a dummy value far away from the drift
+adjust_drift_via_PT=function(drift_directory,PT_key_file,PT_directory,max_PT_to_drift,SWOT_time){
+  
+  # drift_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/drifts/'
+  # PT_key_file='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/PT drift key.csv'
+  # PT_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/QAQC PTs/'
+  # max_PT_to_drift= 2.00 #km,  
+  # SWOT_time= as.POSIXct('2021-09-02 23:04:37') # a dummy value far away from the drift
 
 #correct drifts to PTs-----
 
@@ -124,6 +126,10 @@ joined_DF=difference_left_join(GNSS_with_weights,final_PT_with_SWOT,by=c("dateti
 
 plot(joined_DF$datetime.x,joined_DF$ortho_height_m_cgvd2013,ylim=c(25,33))
 points(joined_DF$datetime.x,joined_DF$final_drift_height,col='red')
+
+
+return(joined_DF)
+}
 
 
 #--------------------------
