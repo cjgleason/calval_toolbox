@@ -1,11 +1,9 @@
 # calval_toolbox
 Toolboxes for hydro corrections of calval data
 
-The 'toolbox_dev.R' is currently the main script to run.
+# correct_PT_to_GNSS
 
-At the moment, it runs a correction for PTs to get orthometric heights from a GNSS drift.
-
-What it does is the following:
+What it does:
 
 1.	Looks at a raw PT file and checks to see if either of the ‘QAQC’ or ‘flagged’ folders contain a copy of it so that we can efficiently re-run without manual checking
 2.	Joins that raw PT file to a GNSS drift based on a key to associate GNSS drifts with the PTs
@@ -21,3 +19,13 @@ c.	Offset consistency- did the PT offset change dramatically from put in to take
 d.	Sudden shifts- are there shifts in the record other than at the beginning and end that indicate a suddent shift?
 9.	If it passes all the tests, it places the PT with its new heights in the QAQC folder
 a.	If it fails, it prints the data and adds a column with an error message that describes why it failed in a ‘flagged’ folder so a tech can look at it
+
+
+# adjust_drift_via_PT
+
+What it does:
+
+1. Reads in QA/QCd PTs from above, along with GNSS drifts
+2. Calcualtes the distance from every GNSS position @ 1Hz to all PTs less than a threshold
+3. Calculates the difference between PT level @ SWOT overpass time to PT Level closest to each 1Hz position
+4. Applies an IDW (power 2) to adust the height of the GNSS based on any number of PTs, where each adjustment is time varying based on #3
