@@ -118,12 +118,11 @@ joined_DF=difference_left_join(GNSS_with_weights,final_PT_with_SWOT,by=c("dateti
   
   #we'll group these at 1 Hz and then apply IDW
    group_by(datetime.x) %>%
-   mutate(drift_shift=  sum(SWOT_time_level_correction / PT_weight))%>%
-   mutate(final_drift_height = ortho_height_m_cgvd2013 + drift_shift)
+   mutate(final_drift_height=  sum( ( (ortho_height_m_cgvd2013+SWOT_time_level_correction ) /(GNSS_to_PT_km^2))) / sum ( (1/(GNSS_to_PT_km^2)) )  )
   
 #---------
 
-plot(joined_DF$datetime.x,joined_DF$ortho_height_m_cgvd2013)
+plot(joined_DF$datetime.x,joined_DF$ortho_height_m_cgvd2013,ylim=c(25,33))
 points(joined_DF$datetime.x,joined_DF$final_drift_height,col='red')
 
 
