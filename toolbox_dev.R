@@ -46,8 +46,14 @@ source('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox
   }
 #-----------------------------
 
+
 #correct drifts to PTs-----
-#TODO
+drift_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/drifts/'
+
+setwd(drift_directory)
+drift_in=read.csv(list.files(drift_directory)[1],header = TRUE)
+
+
 #--------------------------
 
 
