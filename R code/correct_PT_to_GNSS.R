@@ -7,7 +7,7 @@ correct_PT_to_GNSS= function(raw_PT_file,PT_key_file,dist_thresh,time_thresh,PT_
   library(fuzzyjoin)
   library(geodist)
   library(bayesbio)
-  filename=sub("\\..*","",raw_PT_file)
+  filename=sub(,"",raw_PT_file)
   
   handle_raw_PT=function(raw_PT_file,PT_key_fil,PT_data_directory,GNSS_drift_data_directory){
     #read in raw PT--------------

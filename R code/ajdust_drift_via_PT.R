@@ -1,4 +1,4 @@
-adjust_drift_via_PT=function(drift_directory,PT_key_file,PT_directory,max_PT_to_drift,SWOT_time){
+adjust_drift_via_PT=function( fileID,drift_directory,PT_key_file,PT_directory,max_PT_to_drift,SWOT_time, output_directory){
   
   # drift_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/drifts/'
   # PT_key_file='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/PT drift key.csv'
@@ -15,7 +15,7 @@ library(stringr)
 
 #get the 1HZ GNSS data and calculate distances to PTs within a threshold----------
 setwd(drift_directory)
-drift_in=read.csv(list.files(drift_directory)[1],header = TRUE) %>%
+drift_in=read.csv(paste0(drift_directory,fileID),header = TRUE) %>%
   mutate(lat=latitude_decimal_degree)%>%
   mutate(lon=longitude_decimal_degree)%>%
   select(-latitude_decimal_degree,-longitude_decimal_degree)%>%
@@ -128,7 +128,8 @@ plot(joined_DF$datetime.x,joined_DF$ortho_height_m_cgvd2013,ylim=c(25,33))
 points(joined_DF$datetime.x,joined_DF$final_drift_height,col='red')
 
 
-return(joined_DF)
+filename= sub("\\..*","",fileID)
+saveRDS(joined_DF,paste0(output_directory,filename,'.rds'))
 }
 
 
