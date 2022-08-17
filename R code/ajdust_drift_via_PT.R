@@ -1,4 +1,4 @@
-adjust_drift_via_PT=function( fileID,drift_directory,PT_key_file,PT_directory,max_PT_to_drift,SWOT_time, output_directory){
+adjust_drift_via_PT=function( fileID,drift_directory,PT_key_file,PT_directory,max_PT_to_drift,SWOT_time, output_directory,zone){
   
   # drift_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/drifts/'
   # PT_key_file='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/PT drift key.csv'
@@ -38,7 +38,7 @@ GNSS_with_weights= geo_join(drift_in,PT_key_in,  by = c('lon','lat'),  method = 
   group_by(datetime) %>%
   mutate(PT_weight= (1/GNSS_to_PT_km)^4)%>%
   ungroup()  %>%
-  select(-lat.x,-lat.y,-lon.x,-lon.y,-PT_install_GNSS_offset)
+  select(-lat.y,-lon.y,-PT_install_GNSS_offset)
 #this gives us the distance from every GNSS timestep to the nearest PT. 
 #we've grouped by datetime, as at each instant we want to figure out the nearst PTs and apply that
 #as a first cut, we can do an IDW to figuure out a weighting function for that part of the drift.
@@ -65,7 +65,7 @@ SWOT_PT=group_by(matching_PTs,PT_Serial)%>%
   transmute(PT_Serial=PT_Serial,SWOT_datetime=datetime,time_diff_to_SWOT_sec=time_diff_to_SWOT_sec,
             level_at_SWOT_time=corrected_level,SWOT_sd_GNSS=sd_GNSS,PT_sd_GNSS=sd_GNSS)
 
-#create an offset based on the swot tim--
+#create an offset based on the swot time----
 final_PT_with_SWOT=matching_PTs%>%
   left_join(SWOT_PT,by='PT_Serial')  %>%
   mutate(SWOT_time_level_correction = corrected_level -level_at_SWOT_time)%>%
@@ -122,6 +122,18 @@ joined_DF=difference_left_join(GNSS_with_weights,final_PT_with_SWOT,by=c("dateti
    group_by(datetime.x) %>%
    mutate(final_drift_height=  sum( ( (ortho_height_m_cgvd2013+SWOT_time_level_correction ) /(GNSS_to_PT_km^2))) / sum ( (1/(GNSS_to_PT_km^2)) )  )
   
+LongLatToUTM<-function(x,y,zone){
+  xy <- data.frame(ID = 1:length(x), X = x, Y = y)
+  coordinates(xy) <- c("X", "Y")
+  proj4string(xy) <- CRS("+proj=longlat +datum=WGS84")  ## for example
+  res <- spTransform(xy, CRS(paste("+proj=utm +zone=",zone," ellps=WGS84",sep='')))
+  res=st_as_sf(res)
+  return(data.frame(x=st_coordinates(res)[,1],y=st_coordinates(res)[,2]))
+}
+
+joined_DF=ungroup(joined_DF) %>%
+mutate( UTM_x=LongLatToUTM(joined_DF$lon.x,joined_DF$lat.x,zone)[,1],
+                 UTM_y=LongLatToUTM(joined_DF$lon.x,joined_DF$lat.x,zone)[,2])
 #---------
 
 plot(joined_DF$datetime.x,joined_DF$ortho_height_m_cgvd2013,ylim=c(25,33))

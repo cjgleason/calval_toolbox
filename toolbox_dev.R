@@ -8,6 +8,8 @@ flagged_PT_output_directory='D:/OneDrive -\ University of Massachusetts/calval/T
 
 library(dplyr)
 
+# munge PTs if needed------
+
 dist_thresh=15 # 15m
 time_thresh= 15*60 #minutes as seconds, centered, so 15 =30 mins total time
 GNSS_sd_thresh=0.15 # 15cm how much variance do you want in the GNSS data when it is within the distance threshold?
@@ -15,7 +17,6 @@ change_thresh_15_min= 0.20 #m, so 20cm. This checks for a time-on-time change in
 #typically, these occur during put in and takeout as suddent shifts while it is deployed are rare. 
 offset_diff_thresh=0.01 #m, so 1cm. the the PT apparantly shift by more than a cm?
 
-# munge PTs if needed------
 #check for un-munged PT data
 #pull filename before the .csv
 raw_PT=sub( "\\..*","", list.files(PT_data_directory))
@@ -46,7 +47,6 @@ source('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox
   }
 #-----------------------------
 
-
 #correct drifts to PTs-----
 drift_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/drifts/'
 PT_key_file='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/PT drift key.csv'
@@ -54,16 +54,20 @@ PT_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_t
 output_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/corrected drifts/'
 max_PT_to_drift= 2.00 #km,  
 SWOT_time= as.POSIXct('2021-09-02 23:04:37') # a dummy value far away from the drift
+zone=18 #UTM zone 18N
 # 
 # fileID=list.files(drift_directory)[1]
 source('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/R code/ajdust_drift_via_PT.R')
 
-
-lapply(list.files(drift_directory),adjust_drift_via_PT,drift_directory=drift_directory,
+dummy=lapply(list.files(drift_directory),adjust_drift_via_PT,drift_directory=drift_directory,
        PT_key_file=PT_key_file,PT_directory=PT_directory,max_PT_to_drift=max_PT_to_drift,
-       SWOT_time=SWOT_time,output_directory=output_directory)
+       SWOT_time=SWOT_time,output_directory=output_directory,zone=zone)
+
 #--------------------------
 
+#calculate slopes and heights within nodes and reaches------
+
+#--------
 
 
 
