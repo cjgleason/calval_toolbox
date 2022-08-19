@@ -59,15 +59,42 @@ zone=18 #UTM zone 18N
 # fileID=list.files(drift_directory)[1]
 source('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/R code/ajdust_drift_via_PT.R')
 
-dummy=lapply(list.files(drift_directory),adjust_drift_via_PT,drift_directory=drift_directory,
+#check for un-munged drift data
+#pull filename before the .rds
+raw_drifts=sub( "\\..*","", list.files(drift_directory))
+
+#what raw drift data have not been munged
+unmunged_drifts=setdiff(raw_drifts,sub( "\\..*","", list.files(output_directory)))
+#run the drifts that are not yet munged
+
+if(!identical(unmunged_drifts,character(0))){
+dummy=lapply(paste0(drift_directory,unmunged_drifts),adjust_drift_via_PT,drift_directory=drift_directory,
        PT_key_file=PT_key_file,PT_directory=PT_directory,max_PT_to_drift=max_PT_to_drift,
        SWOT_time=SWOT_time,output_directory=output_directory,zone=zone)
+}
 
 #--------------------------
 
 #calculate slopes and heights within nodes and reaches------
+library(readxl)
+metadatain= read_excel('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/CTR_Aug21_nodes_reaches.xlsx')
+this_river_reach_IDs= as.numeric(as.character(unique(metadatain$reach_id)))
+this_river_node_IDs= as.numeric(as.character(unique(metadatain$node_id)))
+utm_zone=18
+buffer=500 #m
+rivername='Connecticut'
 
+SWORD_path='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/na_sword_v11.nc'
+drift_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/corrected drifts/'
+PT_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/QAQC PTs/'
+output_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/slopes and wses/'
+
+source('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/R code/calculate_slope_wse_fromdrift.R')
+
+dummy=calculate_sope_wse_fromdrift(SWORD_path=SWORD_path,drift_directory=drift_directory,PT_directory=PT_directory,
+                                   output_directory=output_directory,this_river_reach_IDs=this_river_reach_IDs,
+                                   this_river_node_IDs=this_river_node_IDs,utm_zone=utm_zone, buffer=buffer,rivername=rivername)
 #--------
 
 
-
+test=readRDS('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/slopes and wses/Connecticut_dritf_wse_slope.rds')
