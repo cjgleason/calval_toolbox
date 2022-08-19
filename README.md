@@ -36,7 +36,8 @@ What it does:
 What it does:
 
 1. Reads in reach and node IDs you care about for a given river
-2. Calculates wse (mean and sd) within a node by averaging within a box defined by SWORD, where the dimensions are node_length * max_widtdh to pull all drift points
+2. Calculates wse (mean and sd) within a node by averaging within a box defined by SWORD, where the dimensions are node_length * max_width to pull all drift points
+
 ![alt text](https://github.com/cjgleason/calval_toolbox/blob/main/examplenodeboxes.JPG?raw=true)
 
 2a. This is done by drift, so values have a timestamp
