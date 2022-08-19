@@ -97,4 +97,4 @@ dummy=calculate_sope_wse_fromdrift(SWORD_path=SWORD_path,drift_directory=drift_d
 #--------
 
 
-test=readRDS('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/slopes and wses/Connecticut_dritf_wse_slope.rds')
+test=readRDS('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/slopes and wses/Connecticut_node_wses.rds')

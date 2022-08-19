@@ -161,7 +161,7 @@ calc_node_wse=function(drift_file,node_df,cl_df){
 
   points_in_node=st_intersection(spatial_drift,final_node_df)%>%
     group_by(node_ID)%>%
-    summarize(node_wse_bar=mean(final_drift_height,na.rm=T),node_wse_sd=sd(final_drift_height,na.rm=T))
+    summarize(node_wse_bar=mean(final_drift_height,na.rm=T),node_wse_sd=sd(final_drift_height,na.rm=T),time=mean(datetime.x))
     
 
 }
