@@ -41,6 +41,8 @@ What it does:
 ![alt text](https://github.com/cjgleason/calval_toolbox/blob/main/examplenodeboxes.JPG?raw=true)
 
 2a. This is done by drift, so values have a timestamp
+
 3. Calculates wse (mean and sd) within a reach by using SWORD's bounding box coordinates to pull all drift points within the reach
+
 3a. This is done by drift, so value have a timestamp
 
