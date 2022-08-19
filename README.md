@@ -29,3 +29,16 @@ What it does:
 2. Calcualtes the distance from every GNSS position @ 1Hz to all PTs less than a threshold
 3. Calculates the difference between PT level @ SWOT overpass time to PT Level closest to each 1Hz position
 4. Applies an IDW (power 2) to adust the height of the GNSS based on any number of PTs, where each adjustment is time varying based on #3
+![alt text](https://github.com/cjgleason/calval_toolbox/blob/main/idw.gif?raw=true)
+
+# calculate_slope_wse_fromdrift
+
+What it does:
+
+1. Reads in reach and node IDs you care about for a given river
+2. Calculates wse (mean and sd) within a node by averaging within a box defined by SWORD, where the dimensions are node_lenght * max_widtdh to pull all drift points
+![alt text](https://github.com/cjgleason/calval_toolbox/blob/main/example node boxes.jpg?raw=true)
+2a. This is done by drift, so values have a timestamp
+3. Calutes wse (mean and sd) within a reach by using SWORD's bounding box coordinates to pull all drift points within the reach
+3a. This is done by drift, so value have a timestamp
+
