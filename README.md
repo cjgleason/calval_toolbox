@@ -52,6 +52,8 @@ TODO: read in reach polygon clipped from the airphotos taken with the lidar
 
 TODO: clip the node polygons to that reach polygon
 
+TODO: make it faster after getting the new polys- currently two hours to run
+
 What it does:
 1. creates node polygons based on node length and max width
 1a. samples lidar raster within each polygon
