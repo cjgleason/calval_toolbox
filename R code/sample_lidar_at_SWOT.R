@@ -208,7 +208,7 @@ end_time=Sys.time()
 
 end_time-start_time
 
-saveRDS(node_stats,paste0(output_path,river_name,lidar_date,'node_wses.rds'))
-saveRDS(reach_stats,paste0(output_path,river_name,lidar_date,'reach_wses.rds'))
+saveRDS(node_stats,paste0(output_path,river_name,'node_wses.rds'))
+saveRDS(reach_stats,paste0(output_path,river_name,'reach_wses.rds'))
 
 }
