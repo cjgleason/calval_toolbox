@@ -1,11 +1,3 @@
-#TODO
-#calculate separate offset for put in and pull out, and check that to ensure a lack of shifting.
-#make hdyro corrections bit.
-
-PT_data_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/raw PTs/'
-QA_QC_PT_output_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/QAQC PTs/'
-flagged_PT_output_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/flagged PTs/'
-
 library(dplyr)
 
 # munge PTs if needed------
@@ -31,20 +23,25 @@ unmunged_PTs=setdiff(raw_PT,c(flagged_PTs,QA_QC_PTs))
 if(!identical(unmunged_PTs,character(0))){
   unmunged_PTs=paste0(unmunged_PTs,'.csv')
   
-source('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/R code/correct_PT_to_GNSS.R')
-
+  source('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/R code/correct_PT_to_GNSS.R')
+  
   GNSS_drift_data_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/drifts/'
   clean_PT_output_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/offset PTs/'
   raw_PT_file='CPT01_20210909.csv'
   PT_key_file='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/PT drift key.csv'
-
-
+  
+  
   PT_files=list.files(PT_data_directory)
   dummy=lapply(unmunged_PTs,correct_PT_to_GNSS,PT_key_file=PT_key_file,dist_thresh=dist_thresh,
-         time_thresh=time_thresh,PT_data_directory=PT_data_directory,GNSS_drift_data_directory=GNSS_drift_data_directory,
-         QA_QC_PT_output_directory=QA_QC_PT_output_directory,flagged_PT_directory=flagged_PT_directory,
-         change_thresh_15_min=change_thresh_15_min,GNSS_sd_thresh,offset_diff_thresh)
-  }
+               time_thresh=time_thresh,PT_data_directory=PT_data_directory,GNSS_drift_data_directory=GNSS_drift_data_directory,
+               QA_QC_PT_output_directory=QA_QC_PT_output_directory,flagged_PT_directory=flagged_PT_directory,
+               change_thresh_15_min=change_thresh_15_min,GNSS_sd_thresh,offset_diff_thresh)
+}PT_data_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/raw PTs/'
+QA_QC_PT_output_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/QAQC PTs/'
+flagged_PT_output_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/flagged PTs/'
+
+
+
 #-----------------------------
 
 #correct drifts to PTs-----
@@ -73,7 +70,7 @@ dummy=lapply(paste0(drift_directory,unmunged_drifts),adjust_drift_via_PT,drift_d
        SWOT_time=SWOT_time,output_directory=output_directory,zone=zone)
 }
 
-#--------------------------
+#-----------------------------
 
 #calculate slopes and heights within nodes and reaches------
 library(readxl)
@@ -94,7 +91,20 @@ source('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox
 dummy=calculate_sope_wse_fromdrift(SWORD_path=SWORD_path,drift_directory=drift_directory,PT_directory=PT_directory,
                                    output_directory=output_directory,this_river_reach_IDs=this_river_reach_IDs,
                                    this_river_node_IDs=this_river_node_IDs,utm_zone=utm_zone, buffer=buffer,rivername=rivername)
-#--------
+#-----------------------------
 
+#pull lidar heights from lidar rasters (very slow)----
+SWORD_path='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/na_sword_v11.nc'
+library(readxl)
+metadatain= read_excel('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/CTR_Aug21_nodes_reaches.xlsx')
+this_river_reach_IDs= as.numeric(as.character(unique(metadatain$reach_id)))
+this_river_node_IDs= as.numeric(as.character(unique(metadatain$node_id)))
+utm_zone=18
+lidar_date= '08-30-2021 12:00:00'
+raster_path='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/Rasters/'
+output_path= 'D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/lidar wse products/'
+river_name= 'Connecticut'
 
-test=readRDS('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/slopes and wses/Connecticut_node_wses.rds')
+dummy=sample_lidar_at_SWOT(SWORD_path=SWORD_path,this_river_node_IDs= this_river_node_IDs,this_river_reach_IDs= this_river_reach_IDs,
+                           utm_zone=utm_zone,lidar_date=lidar_date,rather_path=raster_path,output_path=output_path,river_name=river_name)
+#-----------------------------
