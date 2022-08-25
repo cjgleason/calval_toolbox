@@ -49,6 +49,7 @@ What it does:
 # sample_lidar_at_SWOT
 
 TODO: read in reach polygon clipped from the airphotos taken with the lidar
+
 TODO: clip the node polygons to that reach polygon
 
 What it does:
