@@ -46,3 +46,16 @@ What it does:
 
 3a. This is done by drift, so value have a timestamp
 
+# sample_lidar_at_SWOT
+
+TODO: read in reach polygon clipped from the airphotos taken with the lidar
+TODO: clip the node polygons to that reach polygon
+
+What it does:
+1. creates node polygons based on node length and max width
+1a. samples lidar raster within each polygon
+
+2. creates (for now) a reach polygon from the nodes
+2a. samples lidar raster from the polygon
+
+
