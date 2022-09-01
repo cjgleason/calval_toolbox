@@ -1,6 +1,20 @@
 # calval_toolbox
 Toolboxes for hydro corrections of calval data
 
+TODO: read in reach polygon clipped from the airphotos taken with the lidar
+
+TODO: clip the node polygons to that reach polygon for lidar
+
+TODO: make lidar faster after getting the new polys- currently two hours to run
+
+TODO: clean up corrected drift fieldnames
+
+TODO: add uncertainty propogation into corrected drift
+
+TODO: add drift spike QAQC (metadata)?
+
+TODO: add visualization
+
 # correct_PT_to_GNSS
 
 What it does:
@@ -47,12 +61,6 @@ What it does:
 3a. This is done by drift, so value have a timestamp
 
 # sample_lidar_at_SWOT
-
-TODO: read in reach polygon clipped from the airphotos taken with the lidar
-
-TODO: clip the node polygons to that reach polygon
-
-TODO: make it faster after getting the new polys- currently two hours to run
 
 What it does:
 1. creates node polygons based on node length and max width
