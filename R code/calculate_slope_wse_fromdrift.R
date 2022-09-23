@@ -114,12 +114,12 @@ calc_node_wse=function(drift_file,node_df,cl_df){
     mutate(node_angle= atan((cl_UTM_y[cl_id == min(cl_id)]-cl_UTM_y[cl_id == max(cl_id)])/(cl_UTM_x[cl_id == min(cl_id)]-cl_UTM_x[cl_id == max(cl_id)])))%>%
     select(-geometry)%>%
     #make a polygon geometry- 4 points, with the first point repeated for 5 total points
-    mutate(point1_x= node_UTM_x +cos(node_angle)*node_length/2, 
+    mutate(point1_x= node_UTM_x+cos(node_angle)*node_length/2, 
            point1_y= node_UTM_y+sin(node_angle)*node_length/2,
            point2_x=node_UTM_x -cos(node_angle)*node_length/2,
-           point2_y=node_UTM_y-sin(node_angle)*node_length/2,
+           point2_y=node_UTM_y- sin(node_angle)*node_length/2,
            point3_x=node_UTM_x +cos(node_angle-(90*pi/180))*node_wmax/2,
-           point3_y=node_UTM_y+sin(node_angle-(90*pi/180))*node_wmax/2,
+           point3_y=node_UTM_y+ sin(node_angle-(90*pi/180))*node_wmax/2,
            point4_x=node_UTM_x -cos(node_angle-(90*pi/180))*node_wmax/2,
            point4_y= node_UTM_y-sin(node_angle-(90*pi/180))*node_wmax/2) %>%
    mutate(node_box_x_max=max(c(point1_x,point2_x,point3_x,point4_x)),
