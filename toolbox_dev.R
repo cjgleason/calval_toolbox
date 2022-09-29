@@ -35,7 +35,7 @@ if(!identical(unmunged_PTs,character(0))){
   dummy=lapply(unmunged_PTs,correct_PT_to_GNSS,PT_key_file=PT_key_file,dist_thresh=dist_thresh,
                time_thresh=time_thresh,PT_data_directory=PT_data_directory,GNSS_drift_data_directory=GNSS_drift_data_directory,
                QA_QC_PT_output_directory=QA_QC_PT_output_directory,flagged_PT_directory=flagged_PT_directory,
-               change_thresh_15_min=change_thresh_15_min,GNSS_sd_thresh,offset_diff_thresh)
+               change_thresh_15_min=change_thresh_15_min,GNSS_sd_thresh=GNSS_sd_thresh,offset_diff_thresh=offset_diff_thresh)
 }PT_data_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/raw PTs/'
 QA_QC_PT_output_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/QAQC PTs/'
 flagged_PT_output_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/flagged PTs/'
