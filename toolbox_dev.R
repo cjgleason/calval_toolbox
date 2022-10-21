@@ -1,13 +1,18 @@
 library(dplyr)
 
+setwd('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/')
+PT_data_directory='Willamette/Willamette raw PTs/'
+QA_QC_PT_output_directory='Willamette/Willamette munged PTs/'
+flagged_PT_output_directory='Willamette/Willamette flagged PTs/'
+GNSS_drift_data_directory='Willamette/Willamette Drifts/'
+PT_key_file='Willamette/WM_Key.csv'
 # munge PTs if needed------
 
-dist_thresh=15 # 15m
+dist_thresh=45 # 15m
 time_thresh= 15*60 #minutes as seconds, centered, so 15 =30 mins total time
 GNSS_sd_thresh=0.15 # 15cm how much variance do you want in the GNSS data when it is within the distance threshold?
-change_thresh_15_min= 0.20 #m, so 20cm. This checks for a time-on-time change in flow of more than xxxcm to check for suddent shifts in the PT.
-#typically, these occur during put in and takeout as suddent shifts while it is deployed are rare. 
-offset_diff_thresh=0.01 #m, so 1cm. the the PT apparantly shift by more than a cm?
+offset_sd_thresh=0.10 #m, so 10cm. the the PT apparantly shift by more than a cm?
+change_thresh_15_min=0.05#m- does it change more than 5cm in 15 minutes? that is a discontinuity in offset
 
 #check for un-munged PT data
 #pull filename before the .csv
@@ -21,26 +26,13 @@ unmunged_PTs=setdiff(raw_PT,c(flagged_PTs,QA_QC_PTs))
 
 
 if(!identical(unmunged_PTs,character(0))){
-  unmunged_PTs=paste0(unmunged_PTs,'.csv')
+  source('R code/correct_PT_to_GNSS.R')
   
-  source('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/R code/correct_PT_to_GNSS.R')
-  
-  GNSS_drift_data_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/drifts/'
-  clean_PT_output_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/offset PTs/'
-  raw_PT_file='CPT01_20210909.csv'
-  PT_key_file='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/PT drift key.csv'
-  
-  
-  PT_files=list.files(PT_data_directory)
   dummy=lapply(unmunged_PTs,correct_PT_to_GNSS,PT_key_file=PT_key_file,dist_thresh=dist_thresh,
                time_thresh=time_thresh,PT_data_directory=PT_data_directory,GNSS_drift_data_directory=GNSS_drift_data_directory,
                QA_QC_PT_output_directory=QA_QC_PT_output_directory,flagged_PT_directory=flagged_PT_directory,
-               change_thresh_15_min=change_thresh_15_min,GNSS_sd_thresh=GNSS_sd_thresh,offset_diff_thresh=offset_diff_thresh)
-}PT_data_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/raw PTs/'
-QA_QC_PT_output_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/QAQC PTs/'
-flagged_PT_output_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/flagged PTs/'
-
-
+               GNSS_sd_thresh=GNSS_sd_thresh,offset_diff_thresh=offset_diff_thresh,change_thresh_15_min=change_thresh_15_min)
+}
 
 #-----------------------------
 
