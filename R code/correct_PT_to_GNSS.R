@@ -30,7 +30,7 @@ correct_PT_to_GNSS= function(raw_PT_file,PT_key_file,dist_thresh,time_thresh,PT_
     
     #read in offset--------------
     keyfile=read.csv(PT_key_file,stringsAsFactors = FALSE)%>%
-      mutate('driftID'= final_log_file.1)
+      mutate('driftID'= final_log_file)
     #left joining the key in 'offset' gets us a tidy data frame where the info from the key is promulgated to just that PT. a right join would give
     #an n fold expansion across n PTs
     PT_data=PT_data %>%
@@ -81,6 +81,7 @@ correct_PT_to_GNSS= function(raw_PT_file,PT_key_file,dist_thresh,time_thresh,PT_
         filter(GNSS_motion_flag==2)
       
 
+    #  browser()
       #half a second faster to join first on time and then on space
       clean_PT_time=difference_inner_join(prepped_PT,GNSS_log,by='datetime',max_dist=time_thresh)
       #need lon then lat
@@ -148,7 +149,7 @@ correct_PT_to_GNSS= function(raw_PT_file,PT_key_file,dist_thresh,time_thresh,PT_
   
   if(sum(is.na(prepped_PT$PT_lat))==nrow(prepped_PT)){
     print('this PT isnt in the key')
-    saveRDS(output,file=paste0(flagged_PT_output_directory,filename,'_',prepped_PT$PT_Serial[1],'.rds'))
+    saveRDS(prepped_PT,file=paste0(flagged_PT_output_directory,filename,'_',prepped_PT$PT_Serial[1],'.rds'))
     return(NA)
   }
   
@@ -159,8 +160,9 @@ correct_PT_to_GNSS= function(raw_PT_file,PT_key_file,dist_thresh,time_thresh,PT_
 
 
 if (all(is.na(offset_PT))){
-  print('I was asked to find a drift file that doesnt exist')
-  output='I was asked to find a drift file that doesnt exist'
+  print(filename)
+  print('There are no GNSS data within the space-time thresholds')
+  output='There are no GNSS data within the space-time thresholds'
   saveRDS(output,file=paste0(flagged_PT_output_directory,filename,'_',prepped_PT$PT_Serial[1],'.rds'))
   return(NA)}
 # 

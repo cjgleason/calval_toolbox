@@ -8,7 +8,7 @@ GNSS_drift_data_directory='Willamette/Willamette Drifts/'
 PT_key_file='Willamette/WM_Key.csv'
 # munge PTs if needed------
 
-dist_thresh=45 # 15m
+dist_thresh=150 # 15m
 time_thresh= 15*60 #minutes as seconds, centered, so 15 =30 mins total time
 GNSS_sd_thresh=0.15 # 15cm how much variance do you want in the GNSS data when it is within the distance threshold?
 offset_sd_thresh=0.10 #m, so 10cm. the the PT apparantly shift by more than a cm?
