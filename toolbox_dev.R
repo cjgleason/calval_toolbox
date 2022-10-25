@@ -10,6 +10,24 @@ PT_key_file='Willamette/WM_Key.csv'
 QA_QC_drift_output_directory='Willamette/Willamette munged drifts/'
 flagged_drift_output_directory='Willamette/Willamette flagged drifts/'
 
+#create dataframs from drifts---------------------------------------------------------
+#check for un-munged PT data
+#pull filename before the .csv
+raw_GNSS=sub( "\\..*","", list.files(GNSS_drift_data_directory))
+#pull filename before the second _
+QA_QC_drifts=sub('_([^_]*)$',"",list.files(QA_QC_drift_output_directory))
+flagged_drifts=sub('_([^_]*)$',"",list.files(flagged_drift_output_directory))
+#what raw drift data have not been munged
+unmunged_drifts=setdiff(raw_GNSS,c(flagged_drifts,QA_QC_drifts))
+
+if(!identical(unmunged_drifts,character(0))){
+  source('R code/create_GNSS_dataframe.R')
+  
+  dummy=lapply(unmunged_drifts,create_GNSS_dataframe,
+               GNSS_drift_data_directory=GNSS_drift_data_directory,output_directory=QA_QC_drift_output_directory)
+}
+
+#----------------------------------------------------------------------------
 
 # munge PTs if needed------
 
@@ -34,31 +52,13 @@ if(!identical(unmunged_PTs,character(0))){
   source('R code/correct_PT_to_GNSS.R')
   
   dummy=lapply(unmunged_PTs,correct_PT_to_GNSS,PT_key_file=PT_key_file,dist_thresh=dist_thresh,
-               time_thresh=time_thresh,PT_data_directory=PT_data_directory,GNSS_drift_data_directory=GNSS_drift_data_directory,
+               time_thresh=time_thresh,PT_data_directory=PT_data_directory,GNSS_drift_data_directory=QA_QC_drift_output_directory,
                QA_QC_PT_output_directory=QA_QC_PT_output_directory,flagged_PT_directory=flagged_PT_directory,
                GNSS_sd_thresh=GNSS_sd_thresh,offset_diff_thresh=offset_diff_thresh,change_thresh_15_min=change_thresh_15_min)
 }
 
 #-----------------------------
 
-#create dataframs from drifts---------------------------------------------------------
-#check for un-munged PT data
-#pull filename before the .csv
-raw_GNSS=sub( "\\..*","", list.files(GNSS_drift_data_directory))
-#pull filename before the second _
-QA_QC_drifts=sub('_([^_]*)$',"",list.files(QA_QC_drift_output_directory))
-flagged_drifts=sub('_([^_]*)$',"",list.files(flagged_drift_output_directory))
-#what raw drift data have not been munged
-unmunged_drifts=setdiff(raw_GNSS,c(flagged_drifts,QA_QC_drifts))
-
-if(!identical(unmunged_drifts,character(0))){
-  source('R code/create_GNSS_dataframe.R')
-  
-  dummy=lapply(unmunged_drifts,create_GNSS_dataframe,
-               GNSS_drift_data_directory=GNSS_drift_data_directory,output_directory=QA_QC_drift_output_directory)
-}
-
-#----------------------------------------------------------------------------
 
 #calculate slopes and heights within nodes and reaches------
 library(readxl)
