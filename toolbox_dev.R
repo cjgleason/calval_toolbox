@@ -6,6 +6,11 @@ QA_QC_PT_output_directory='Willamette/Willamette munged PTs/'
 flagged_PT_output_directory='Willamette/Willamette flagged PTs/'
 GNSS_drift_data_directory='Willamette/Willamette Drifts/'
 PT_key_file='Willamette/WM_Key.csv'
+
+QA_QC_drift_output_directory='Willamette/Willamette munged drifts/'
+flagged_drift_output_directory='Willamette/Willamette flagged drifts/'
+
+
 # munge PTs if needed------
 
 dist_thresh=150 # 15m
@@ -36,33 +41,24 @@ if(!identical(unmunged_PTs,character(0))){
 
 #-----------------------------
 
-#correct drifts to PTs-----
-drift_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/drifts/'
-PT_key_file='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/PT drift key.csv'
-PT_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/QAQC PTs/'
-output_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/corrected drifts/'
-max_PT_to_drift= 2.00 #km,  
-SWOT_time= as.POSIXct('2021-09-02 23:04:37') # a dummy value far away from the drift
-zone=18 #UTM zone 18N
-# 
-# fileID=list.files(drift_directory)[1]
-source('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/R code/ajdust_drift_via_PT.R')
-
-#check for un-munged drift data
-#pull filename before the .rds
-raw_drifts=sub( "\\..*","", list.files(drift_directory))
-
+#create dataframs from drifts---------------------------------------------------------
+#check for un-munged PT data
+#pull filename before the .csv
+raw_GNSS=sub( "\\..*","", list.files(GNSS_drift_data_directory))
+#pull filename before the second _
+QA_QC_drifts=sub('_([^_]*)$',"",list.files(QA_QC_drift_output_directory))
+flagged_drifts=sub('_([^_]*)$',"",list.files(flagged_drift_output_directory))
 #what raw drift data have not been munged
-unmunged_drifts=setdiff(raw_drifts,sub( "\\..*","", list.files(output_directory)))
-#run the drifts that are not yet munged
+unmunged_drifts=setdiff(raw_GNSS,c(flagged_drifts,QA_QC_drifts))
 
 if(!identical(unmunged_drifts,character(0))){
-dummy=lapply(paste0(drift_directory,unmunged_drifts),adjust_drift_via_PT,drift_directory=drift_directory,
-       PT_key_file=PT_key_file,PT_directory=PT_directory,max_PT_to_drift=max_PT_to_drift,
-       SWOT_time=SWOT_time,output_directory=output_directory,zone=zone)
+  source('R code/create_GNSS_dataframe.R')
+  
+  dummy=lapply(unmunged_drifts,create_GNSS_dataframe,
+               GNSS_drift_data_directory=GNSS_drift_data_directory,output_directory=QA_QC_drift_output_directory)
 }
 
-#-----------------------------
+#----------------------------------------------------------------------------
 
 #calculate slopes and heights within nodes and reaches------
 library(readxl)
@@ -105,3 +101,36 @@ dummy=sample_lidar_at_SWOT(SWORD_path=SWORD_path,this_river_node_IDs= this_river
                            utm_zone=utm_zone,lidar_date=lidar_date,raster_path=raster_path,output_path=output_path,river_name=river_name)
 #-----------------------------
 
+
+
+
+
+
+# 
+# #correct drifts to PTs-----
+# drift_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/drifts/'
+# PT_key_file='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/PT drift key.csv'
+# PT_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/QAQC PTs/'
+# output_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/corrected drifts/'
+# max_PT_to_drift= 2.00 #km,  
+# SWOT_time= as.POSIXct('2021-09-02 23:04:37') # a dummy value far away from the drift
+# zone=18 #UTM zone 18N
+# # 
+# # fileID=list.files(drift_directory)[1]
+# source('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/R code/ajdust_drift_via_PT.R')
+# 
+# #check for un-munged drift data
+# #pull filename before the .rds
+# raw_drifts=sub( "\\..*","", list.files(drift_directory))
+# 
+# #what raw drift data have not been munged
+# unmunged_drifts=setdiff(raw_drifts,sub( "\\..*","", list.files(output_directory)))
+# #run the drifts that are not yet munged
+# 
+# if(!identical(unmunged_drifts,character(0))){
+# dummy=lapply(paste0(drift_directory,unmunged_drifts),adjust_drift_via_PT,drift_directory=drift_directory,
+#        PT_key_file=PT_key_file,PT_directory=PT_directory,max_PT_to_drift=max_PT_to_drift,
+#        SWOT_time=SWOT_time,output_directory=output_directory,zone=zone)
+# }
+# 
+# #-----------------------------
