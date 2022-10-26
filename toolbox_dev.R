@@ -1,16 +1,30 @@
 library(dplyr)
 
 setwd('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/')
+
+#PT paths------------------------------------------
 PT_data_directory='Willamette/Willamette raw PTs/'
 QA_QC_PT_output_directory='Willamette/Willamette munged PTs/'
 flagged_PT_output_directory='Willamette/Willamette flagged PTs/'
-GNSS_drift_data_directory='Willamette/Willamette Drifts/'
 PT_key_file='Willamette/WM_Key.csv'
+#--------------------------------------------------
 
+#drift paths------------------------------------------
+GNSS_drift_data_directory='Willamette/Willamette Drifts/'
 QA_QC_drift_output_directory='Willamette/Willamette munged drifts/'
 flagged_drift_output_directory='Willamette/Willamette flagged drifts/'
+#--------------------------------------------------
 
-#create dataframs from drifts---------------------------------------------------------
+#sword paths----------------------------------------
+SWORD_path='na_sword_v11.nc'
+munged_drift_directory='Willamette/Willamette munged drifts/'
+PT_directory='Willamette/Willamette munged PTs/'
+output_directory='Willamette/SWORD products/'
+#---------------------------------------------------
+
+###################################################################
+
+#create dataframes from drifts---------------------------------------------------------
 #check for un-munged PT data
 #pull filename before the .csv
 raw_GNSS=sub( "\\..*","", list.files(GNSS_drift_data_directory))
@@ -27,7 +41,7 @@ if(!identical(unmunged_drifts,character(0))){
                GNSS_drift_data_directory=GNSS_drift_data_directory,output_directory=QA_QC_drift_output_directory)
 }
 
-#----------------------------------------------------------------------------
+#-------------------------------------------------
 
 # munge PTs if needed------
 
@@ -61,25 +75,23 @@ if(!identical(unmunged_PTs,character(0))){
 
 
 #calculate slopes and heights within nodes and reaches------
-library(readxl)
-metadatain= read_excel('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/CTR_Aug21_nodes_reaches.xlsx')
-this_river_reach_IDs= as.numeric(as.character(unique(metadatain$reach_id)))
-this_river_node_IDs= as.numeric(as.character(unique(metadatain$node_id)))
-utm_zone=18
+
+SWORD_reach= read.csv('Willamette/Willamette nodes.csv')
+this_river_reach_IDs= as.numeric(as.character(unique(SWORD_reach$reach_id)))
+this_river_node_IDs= as.numeric(as.character(unique(SWORD_reach$node_id)))
+utm_zone=10
 buffer=500 #m
-rivername='Connecticut'
+rivername='Willamette'
 
-SWORD_path='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/na_sword_v11.nc'
-drift_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/corrected drifts/'
-PT_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/QAQC PTs/'
-output_directory='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/slopes and wses/'
-
-source('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/R code/calculate_slope_wse_fromdrift.R')
+source('R code/calculate_slope_wse_fromdrift.R')
 
 dummy=calculate_sope_wse_fromdrift(SWORD_path=SWORD_path,drift_directory=drift_directory,PT_directory=PT_directory,
                                    output_directory=output_directory,this_river_reach_IDs=this_river_reach_IDs,
                                    this_river_node_IDs=this_river_node_IDs,utm_zone=utm_zone, buffer=buffer,rivername=rivername)
 #-----------------------------
+
+
+
 
 #pull lidar heights from lidar rasters (very slow)----
 SWORD_path='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/na_sword_v11.nc'

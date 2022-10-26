@@ -54,8 +54,10 @@ correct_PT_to_GNSS= function(raw_PT_file,PT_key_file,dist_thresh,time_thresh,PT_
     }
     
     unit_PT_process = function(log_file,prepped_PT,dist_thresh,time_thresh,GNSS_drift_data_directory){
-      GNSS_log=readRDS(paste0(GNSS_drift_data_directory,log_file,'.rds'))
+      GNSS_log=readRDS(paste0(GNSS_drift_data_directory,log_file,'.rds'))%>%
+        mutate(datetime=GNSS_time_UTC)
 
+   
       #half a second faster to join first on time and then on space
       clean_PT_time=difference_inner_join(prepped_PT,GNSS_log,by='datetime',max_dist=time_thresh)
       #need lon then lat
