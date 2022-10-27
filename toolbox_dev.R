@@ -73,7 +73,6 @@ if(!identical(unmunged_PTs,character(0))){
 
 #-----------------------------
 
-
 #calculate slopes and heights within nodes and reaches------
 
 SWORD_reach= read.csv('Willamette/Willamette nodes.csv')
@@ -93,25 +92,32 @@ dummy=calculate_sope_wse_fromdrift(SWORD_path=SWORD_path,drift_directory=munged_
 
 
 
-#pull lidar heights from lidar rasters (very slow)----
-SWORD_path='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/na_sword_v11.nc'
-library(readxl)
-metadatain= read_excel('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/CTR_Aug21_nodes_reaches.xlsx')
-this_river_reach_IDs= as.numeric(as.character(unique(metadatain$reach_id)))
-this_river_node_IDs= as.numeric(as.character(unique(metadatain$node_id)))
-utm_zone=18
-lidar_date= '08-30-2021 12:00:00'
-raster_path='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/Rasters/'
-output_path= 'D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/lidar wse products/'
-river_name= 'Connecticut'
 
 
 
-source('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/R code/sample_lidar_at_SWOT.R')
 
-dummy=sample_lidar_at_SWOT(SWORD_path=SWORD_path,this_river_node_IDs= this_river_node_IDs,this_river_reach_IDs= this_river_reach_IDs,
-                           utm_zone=utm_zone,lidar_date=lidar_date,raster_path=raster_path,output_path=output_path,river_name=river_name)
-#-----------------------------
+
+
+
+# #pull lidar heights from lidar rasters (very slow)----
+# SWORD_path='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/na_sword_v11.nc'
+# library(readxl)
+# metadatain= read_excel('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/CTR_Aug21_nodes_reaches.xlsx')
+# this_river_reach_IDs= as.numeric(as.character(unique(metadatain$reach_id)))
+# this_river_node_IDs= as.numeric(as.character(unique(metadatain$node_id)))
+# utm_zone=18
+# lidar_date= '08-30-2021 12:00:00'
+# raster_path='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/Rasters/'
+# output_path= 'D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/lidar wse products/'
+# river_name= 'Connecticut'
+# 
+# 
+# 
+# source('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/R code/sample_lidar_at_SWOT.R')
+# 
+# dummy=sample_lidar_at_SWOT(SWORD_path=SWORD_path,this_river_node_IDs= this_river_node_IDs,this_river_reach_IDs= this_river_reach_IDs,
+#                            utm_zone=utm_zone,lidar_date=lidar_date,raster_path=raster_path,output_path=output_path,river_name=river_name)
+# #-----------------------------
 
 
 
