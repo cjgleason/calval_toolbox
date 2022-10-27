@@ -85,7 +85,7 @@ rivername='Willamette'
 
 source('R code/calculate_slope_wse_fromdrift.R')
 
-dummy=calculate_sope_wse_fromdrift(SWORD_path=SWORD_path,drift_directory=drift_directory,PT_directory=PT_directory,
+dummy=calculate_sope_wse_fromdrift(SWORD_path=SWORD_path,drift_directory=munged_drift_directory,PT_directory=PT_directory,
                                    output_directory=output_directory,this_river_reach_IDs=this_river_reach_IDs,
                                    this_river_node_IDs=this_river_node_IDs,utm_zone=utm_zone, buffer=buffer,rivername=rivername)
 #-----------------------------
