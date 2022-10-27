@@ -204,33 +204,23 @@ if (all(is.na(offset_PT))){
   #first strip the offest df into just the GNSS time and the PT correction and SD
    svelte_offset_PT=select(offset_PT,PT_correction,PT_wse_sd,GNSS_time_UTC)
   
+   
   final_PT =  nearestTime(prepped_PT,svelte_offset_PT,'PT_time_UTC','GNSS_time_UTC')%>%
-    #drop PT data obefore instal time
+    #drop PT data before instal' time
     mutate(timediff_install=PT_install_UTC-PT_time_UTC)%>%
     filter(timediff_install<0)%>%
   #drop PT data after uninstall time
-  mutate(timediff_uninstall=PT_uninstall_UTC-PT_time_UTC)%>%
+    mutate(timediff_uninstall=PT_uninstall_UTC-PT_time_UTC)%>%
     filter(timediff_uninstall>0)%>%
     select(-timediff_install,-timediff_uninstall)%>%
     mutate(PT_wse=PT_level+PT_correction)
   
-  #now, check for discontinuities in the PT data. A common discontinuity is at the beginning or end. 
-  diffvec=(c(0,final_PT$PT_wse)-c(final_PT$PT_wse,0))[2:(nrow(final_PT)-1)]
-  
-  change_detected=which(abs(diffvec)>change_thresh_15_min)
-  #if it is just first and last, then it is put in pull out
-  #in that case, just make sure the data are static before and after the changes
- # if (length(change_detected)==0){
+
+
     print(filename)
     print('this file passed all checks')
     saveRDS(final_PT,file=paste0(QA_QC_PT_output_directory,filename,'_',final_PT$PT_Serial[1],'.rds'))
-  # } else {
-  #   print(filename)
-  #   print('there is an offset discontinuity')
-  #   final_PT=mutate(final_PT,error='there is an offset discontinuity')
-  #   saveRDS(final_PT,file=paste0(flagged_PT_output_directory,filename,'_',final_PT$PT_Serial[1],'.rds'))
-  # }
-  
+
 
   
 

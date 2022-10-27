@@ -10,5 +10,9 @@ windows()
 plot(drift_test$GNSS_time_UTC,drift_test$GNSS_wse)}
 
 for (i in 1:length(list.files('Willamette/SWORD products/reach/'))){
-  reach_test_test=readRDS(paste0('Willamette/SWORD products/reach/',list.files('Willamette/SWORD products/reach/')[i]))
+  reach_test=readRDS(paste0('Willamette/SWORD products/reach/',list.files('Willamette/SWORD products/reach/')[i]))
+}
+
+for (i in 1:length(list.files('Willamette/SWORD products/node/'))){
+  node_test=readRDS(paste0('Willamette/SWORD products/node/',list.files('Willamette/SWORD products/node/')[i]))
 }

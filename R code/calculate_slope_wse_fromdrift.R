@@ -26,6 +26,7 @@ nodeIDs=ncvar_get(SWORD_in,'nodes/node_id',verbose=FALSE)
 node_index= which(nodeIDs %in% this_river_node_IDs)
 #-----------------------------------------------------
 
+
 #Node variables-------
 #overwriting with the index limits the RAM needed
 node_x=ncvar_get(SWORD_in, 'nodes/x',verbose=FALSE)[node_index]
@@ -44,7 +45,7 @@ node_df=data.frame(lon=node_x,lat=node_y,node_ID=this_river_node_IDs,node_wmax=n
 node_df= node_df%>%
   mutate(node_UTM_x=LongLatToUTM(node_df$lon,node_df$lat,utm_zone)[,1])%>%
   mutate(node_UTM_y=LongLatToUTM(node_df$lon,node_df$lat,utm_zone)[,2])
-#---------------------
+#------------------------------------------------------
 
 #Reach variables-------
 #overwriting with the index limits the RAM needed
@@ -81,7 +82,7 @@ spatial_reach=spatial_reach%>%
   mutate(xmax=LongLatToUTM(spatial_reach$reach_xmax,spatial_reach$reach_ymin,utm_zone)[,1])%>%
   mutate(ymin=LongLatToUTM(spatial_reach$reach_xmin,spatial_reach$reach_ymin,utm_zone)[,2])%>%
   mutate(ymax=LongLatToUTM(spatial_reach$reach_xmin,spatial_reach$reach_ymax,utm_zone)[,2])
-#---------------------
+#------------------------------------------------------
 
 #centerline variables-------
 cl_reach_IDs= ncvar_get(SWORD_in, 'centerlines/reach_id',verbose=FALSE)
@@ -101,7 +102,7 @@ cl_df=cl_df%>%
   mutate(cl_UTM_x=LongLatToUTM(cl_df$lon,cl_df$lat,utm_zone)[,1])%>%
   mutate(cl_UTM_y=LongLatToUTM(cl_df$lon,cl_df$lat,utm_zone)[,2])
 
-#---------------------
+#------------------------------------------------------
 
 #calculate node wse----------------------------------
 calc_node_wse=function(drift_file,node_df,cl_df,zone){
@@ -169,7 +170,7 @@ calc_node_wse=function(drift_file,node_df,cl_df,zone){
     
 
 }
-#----------------------------------------------------
+#------------------------------------------------------
 
 #calculate reach wse and slope from the drifts-----------------------
 calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river_reach_IDs){
@@ -228,17 +229,14 @@ calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river
                                drift_in$UTM_y> cl_end_search_y1 &
                                drift_in$UTM_y< cl_end_search_y2 )  
 
- if (length(slope_end_index)>0){
+
   slope_start_elevations= drift_in[slope_start_index,]$GNSS_wse
   slope_end_elevations= drift_in[slope_end_index,]$GNSS_wse
   
   difference_slope= (mean(slope_start_elevations)- mean(slope_end_elevations)) / cl_distance
   difference_slope_sd= sqrt(sd(slope_start_elevations)^2+sd(slope_end_elevations)^2)
- }else{
-   difference_slope=NA
-   difference_slope_sd=NA
-   
- }
+
+  if (is.na(difference_slope_sd)){wse_bar=NA}#kluge taht tells us the whole reach wasn't floated
     
 
     output=data.frame(reach_id=reach_id_search,
@@ -258,7 +256,7 @@ calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river
     filter(!is.na(wse_bar))
   
 }
-#---------------------------------------------------------------------
+#------------------------------------------------------
 
 
 drifts = paste0(drift_directory,list.files(drift_directory))
@@ -268,7 +266,10 @@ node_wses=do.call(rbind,lapply(drifts,calc_node_wse,node_df=node_df,cl_df=cl_df,
 
 reach_stats=do.call(rbind,lapply(drifts,calc_reach_stats,spatial_reach=spatial_reach,
                                  buffer=buffer,cl_df=cl_df,zone=utm_zone,this_river_reach_IDs=this_river_reach_IDs))%>%
-  mutate(reach_id=format(reach_id,scientific = FALSE))
+  mutate(reach_id=format(reach_id,scientific = FALSE))%>%
+  filter(!is.na(difference_slope_sd))
+
+
 
 saveRDS(node_wses,paste0(output_directory,'node/',rivername,'_node_wses.rds'))
 saveRDS(reach_stats,paste0(output_directory,'reach/',rivername,'_drift_wse_slope.rds'))
