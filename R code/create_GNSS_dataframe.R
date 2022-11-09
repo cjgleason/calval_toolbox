@@ -46,7 +46,8 @@ GNSS_log=data.frame(GNSS_Lat=Lat,GNSS_Lon=Lon,GNSS_wse=GNSS_wse,GNSS_time_tai=GN
   filter(GNSS_surf_flag==12)%>%
   filter(GNSS_motion_flag==2)%>%
   mutate(GNSS_ellipsoid=GNSS_ellipsoid)%>%
-  filter(GNSS_uncertainty<0.05)
+  filter(GNSS_uncertainty<0.05)%>%
+  mutate(drift_ID= sub('',"",log_file))
 
 #need to recurse this, so a for loop is actually needed!
 for(i in 1:nrow(Info_df)){
@@ -63,6 +64,6 @@ plot(GNSS_log$GNSS_time_UTC,GNSS_log$GNSS_wse)
 
 nc_close(GNSS_nc)
 
-print(paste0(output_directory,log_file,'.rds'))
+print(paste0(output_directory,log_file,'.csv'))
 
-saveRDS(GNSS_log,paste0(output_directory,log_file,'.rds'))}
+write.csv(GNSS_log,paste0(output_directory,log_file,'.csv'))}

@@ -10,7 +10,7 @@ PT_key_file='Willamette/WM_Key.csv'
 #--------------------------------------------------
 
 #drift paths------------------------------------------
-GNSS_drift_data_directory='Willamette/Willamette Drifts/'
+GNSS_drift_data_directory='Willamette/Willamette Raw Drifts/'
 QA_QC_drift_output_directory='Willamette/Willamette munged drifts/'
 flagged_drift_output_directory='Willamette/Willamette flagged drifts/'
 #--------------------------------------------------

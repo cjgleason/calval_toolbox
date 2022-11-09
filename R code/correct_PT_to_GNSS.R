@@ -54,10 +54,11 @@ correct_PT_to_GNSS= function(raw_PT_file,PT_key_file,dist_thresh,time_thresh,PT_
     }
     
     unit_PT_process = function(log_file,prepped_PT,dist_thresh,time_thresh,GNSS_drift_data_directory){
-      GNSS_log=readRDS(paste0(GNSS_drift_data_directory,log_file,'.rds'))%>%
-        mutate(datetime=GNSS_time_UTC)
+      
+      GNSS_log=read.csv(paste0(GNSS_drift_data_directory,log_file,'.csv'),header=TRUE,stringsAsFactors = FALSE)%>%
+        mutate(datetime=GNSS_time_UTC)%>%
+        mutate(datetime=as.POSIXct(datetime))#needed as when it gets written to csv it becomes not a posix object
 
-   
       #half a second faster to join first on time and then on space
       clean_PT_time=difference_inner_join(prepped_PT,GNSS_log,by='datetime',max_dist=time_thresh)
       #need lon then lat
@@ -99,6 +100,7 @@ correct_PT_to_GNSS= function(raw_PT_file,PT_key_file,dist_thresh,time_thresh,PT_
         mutate(PT_wse=PT_level+PT_correction)%>%
         mutate(PT_wse_sd= sqrt(sum(sd(PT_level)^2 + PT_correction_sd^2) ))
       
+   
       return(wse_PT)
       
 
@@ -219,7 +221,7 @@ if (all(is.na(offset_PT))){
 
     print(filename)
     print('this file passed all checks')
-    saveRDS(final_PT,file=paste0(QA_QC_PT_output_directory,filename,'_',final_PT$PT_Serial[1],'.rds'))
+    write.csv(final_PT,file=paste0(QA_QC_PT_output_directory,filename,'_',final_PT$PT_Serial[1],'.csv'))
 
 
   

@@ -40,7 +40,7 @@ node_length=ncvar_get(SWORD_in, 'nodes/node_length',verbose=FALSE)[node_index]
 node_reachid=ncvar_get(SWORD_in, 'nodes/reach_id',verbose=FALSE)[node_index] #key field
 
 
-node_df=data.frame(lon=node_x,lat=node_y,node_ID=this_river_node_IDs,node_wmax=node_max_width,node_length=node_length,reach_id=node_reachid)
+node_df=data.frame(lon=node_x,lat=node_y,node_ID=this_river_node_IDs,node_wmax=node_max_width,node_length=node_length,reach_ID=node_reachid)
 
 node_df= node_df%>%
   mutate(node_UTM_x=LongLatToUTM(node_df$lon,node_df$lat,utm_zone)[,1])%>%
@@ -64,7 +64,7 @@ reach_y_min=ncvar_get(SWORD_in, 'reaches/y_min',verbose=FALSE)[reach_index]
 reach_length=ncvar_get(SWORD_in, 'reaches/reach_length',verbose=FALSE)[reach_index]
 
 
-reach_df=data.frame(lon=reach_x,lat=reach_y,reach_id=this_river_reach_IDs,reach_xmax=reach_x_max,reach_xmin=reach_x_min,
+reach_df=data.frame(lon=reach_x,lat=reach_y,reach_ID=this_river_reach_IDs,reach_xmax=reach_x_max,reach_xmin=reach_x_min,
                     reach_ymax=reach_y_max,reach_ymin=reach_y_min, reach_length=reach_length)
 
 
@@ -93,7 +93,7 @@ cl_y=ncvar_get(SWORD_in, 'centerlines/y',verbose=FALSE)[cl_index]
 cl_id=ncvar_get(SWORD_in, 'centerlines/cl_id',verbose=FALSE)[cl_index]
 cl_node_id=ncvar_get(SWORD_in, 'centerlines/node_id',verbose=FALSE)[cl_index]
 
-cl_df=data.frame(reach_id=cl_reach_IDs[cl_index],lon=cl_x,lat=cl_y,cl_id=cl_id,node_ID=cl_node_id)%>%
+cl_df=data.frame(reach_ID=cl_reach_IDs[cl_index],lon=cl_x,lat=cl_y,cl_id=cl_id,node_ID=cl_node_id)%>%
   filter(!is.na(lat))
   
 cl_df=st_as_sf(cl_df,coords=c('lon','lat'),remove=FALSE, crs='+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
@@ -108,12 +108,14 @@ cl_df=cl_df%>%
 calc_node_wse=function(drift_file,node_df,cl_df,zone){
 
   
-  drift_in=readRDS(drift_file)%>%
+  drift_in=read.csv(drift_file,header=TRUE,stringsAsFactors = FALSE)%>%
       mutate(UTM_x=LongLatToUTM(GNSS_Lon,GNSS_Lat,zone)[,1])%>%
-      mutate(UTM_y=LongLatToUTM(GNSS_Lon,GNSS_Lat,zone)[,2])
+      mutate(UTM_y=LongLatToUTM(GNSS_Lon,GNSS_Lat,zone)[,2])%>%
+      mutate(GNSS_time_UTC=as.POSIXct(GNSS_time_UTC))#needed as when it gets written to csv it becomes not a posix object
   
+
   node_cls=node_df%>%
-    left_join(cl_df,by=c('node_ID','reach_id'))%>%
+    left_join(cl_df,by=c('node_ID','reach_ID'))%>%
     group_by(node_ID)%>%
     filter(cl_id == min(cl_id) | cl_id == max(cl_id)) %>%
     mutate(node_angle= atan((cl_UTM_y[cl_id == min(cl_id)]-cl_UTM_y[cl_id == max(cl_id)])/(cl_UTM_x[cl_id == min(cl_id)]-cl_UTM_x[cl_id == max(cl_id)])))%>%
@@ -163,10 +165,9 @@ calc_node_wse=function(drift_file,node_df,cl_df,zone){
   
   #make drifts spatial
   spatial_drift=st_as_sf(drift_in,coords=c('UTM_x','UTM_y'),crs=paste0('+proj=utm +zone=',zone,' +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs') ) 
-
   points_in_node=st_intersection(spatial_drift,final_node_df)%>%
     group_by(node_ID)%>%
-    summarize(node_wse_bar=mean(GNSS_wse,na.rm=T),node_wse_sd=sd(GNSS_wse,na.rm=T),time=mean(GNSS_time_UTC))
+    summarize(node_wse=mean(GNSS_wse,na.rm=T),node_wse_sd=sd(GNSS_wse,na.rm=T),time=mean(GNSS_time_UTC),reach_ID=reach_ID[1],drift_ID=drift_ID[1])
     
 
 }
@@ -176,14 +177,15 @@ calc_node_wse=function(drift_file,node_df,cl_df,zone){
 calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river_reach_IDs){
   
 
-  drift_in=readRDS(drift_file)%>%
+  drift_in=read.csv(drift_file,header=TRUE,stringsAsFactors = FALSE)%>%
     mutate(UTM_x=LongLatToUTM(GNSS_Lon,GNSS_Lat,zone)[,1])%>%
-    mutate(UTM_y=LongLatToUTM(GNSS_Lon,GNSS_Lat,zone)[,2])
+    mutate(UTM_y=LongLatToUTM(GNSS_Lon,GNSS_Lat,zone)[,2])%>%
+    mutate(GNSS_time_UTC=as.POSIXct(GNSS_time_UTC))#needed as when it gets written to csv it becomes not a posix object
   
   calc_wse_stats=function(reach_id_search, drift_in,spatial_reach,buffer,this_river_reach_IDs){
     
     
-    reach_id_filtered= filter(spatial_reach,reach_id==reach_id_search)
+    reach_id_filtered= filter(spatial_reach,reach_ID==reach_id_search)
     relevant_drift_index= which(  drift_in$GNSS_Lat>reach_id_filtered$reach_ymin &
                                   drift_in$GNSS_Lat<reach_id_filtered$reach_ymax &
                                   drift_in$GNSS_Lon>reach_id_filtered$reach_xmin &
@@ -200,7 +202,7 @@ calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river
     #take points within some distance of xmin, ymin, xmax, ymax
     #we have a 'buffer' variable for this
     
-  this_cl=filter(cl_df,reach_id==reach_id_search)
+  this_cl=filter(cl_df,reach_ID==reach_id_search)
   cl_start=this_cl[1,]
   cl_end=this_cl[nrow(this_cl),]
   
@@ -234,19 +236,19 @@ calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river
   slope_start_elevations= drift_in[slope_start_index,]$GNSS_wse
   slope_end_elevations= drift_in[slope_end_index,]$GNSS_wse
   
-  difference_slope= (mean(slope_start_elevations)- mean(slope_end_elevations)) / cl_distance
-  difference_slope_sd= sqrt(sd(slope_start_elevations)^2+sd(slope_end_elevations)^2)
+  slope= (mean(slope_start_elevations)- mean(slope_end_elevations)) / cl_distance
+  slope_sd= sqrt(sd(slope_start_elevations)^2+sd(slope_end_elevations)^2)
 
-  if (is.na(difference_slope_sd)){wse_bar=NA}#kluge taht tells us the whole reach wasn't floated
+  if (is.na(slope_sd)){wse_bar=NA}#kluge taht tells us the whole reach wasn't floated
     
 
-    output=data.frame(reach_id=reach_id_search,
+    output=data.frame(reach_ID=reach_id_search,
                       wse_bar=reach_wse_bar,
                       wse_sd=reach_wse_sd,
                       wse_start= wse_time_start,
                       wse_end= wse_time_end,
-                      difference_slope= difference_slope,
-                      difference_slope_sd=difference_slope_sd,
+                      slope= slope,
+                      slope_sd=slope_sd,
                       drift_id=drift_file)
   }
   
@@ -265,14 +267,24 @@ drifts = paste0(drift_directory,list.files(drift_directory))
 node_wses=do.call(rbind,lapply(drifts,calc_node_wse,node_df=node_df,cl_df=cl_df,zone=utm_zone))%>%
   mutate(node_ID=format(node_ID,scientific=FALSE))
 
+
+node_geom=node_wses%>%
+  select(node_ID,geometry)
+
+node_wses=as.data.frame(node_wses)%>%
+  select(-geometry)
+
+
+
 reach_stats=do.call(rbind,lapply(drifts,calc_reach_stats,spatial_reach=spatial_reach,
                                  buffer=buffer,cl_df=cl_df,zone=utm_zone,this_river_reach_IDs=this_river_reach_IDs))%>%
-  mutate(reach_id=format(reach_id,scientific = FALSE))%>%
-  filter(!is.na(difference_slope_sd))
+  mutate(reach_ID=format(reach_ID,scientific = FALSE))%>%
+  filter(!is.na(slope_sd))
 
 
 
-saveRDS(node_wses,paste0(output_directory,'node/',rivername,'_node_wses.rds'))
-saveRDS(reach_stats,paste0(output_directory,'reach/',rivername,'_drift_wse_slope.rds'))
+write.csv(node_wses,paste0(output_directory,'node/',rivername,'_node_wses.csv'))
+write.csv(node_geom,paste0(output_directory,'node/',rivername,'_node_geom.csv'))
+write.csv(reach_stats,paste0(output_directory,'reach/',rivername,'_drift_wse_slope.csv'))
 
  }
