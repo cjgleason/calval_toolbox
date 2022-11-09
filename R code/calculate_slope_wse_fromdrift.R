@@ -174,6 +174,8 @@ calc_node_wse=function(drift_file,node_df,cl_df,zone){
 
 #calculate reach wse and slope from the drifts-----------------------
 calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river_reach_IDs){
+  
+
   drift_in=readRDS(drift_file)%>%
     mutate(UTM_x=LongLatToUTM(GNSS_Lon,GNSS_Lat,zone)[,1])%>%
     mutate(UTM_y=LongLatToUTM(GNSS_Lon,GNSS_Lat,zone)[,2])
@@ -188,8 +190,7 @@ calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river
                                   drift_in$GNSS_Lon<reach_id_filtered$reach_xmax)
     
     filtered_drift=drift_in[relevant_drift_index,]
-  
-    
+
     reach_wse_bar=mean(drift_in$GNSS_wse[relevant_drift_index],na.rm=T)
     reach_wse_sd =sd(drift_in$GNSS_wse[relevant_drift_index],na.rm=T)
     wse_time_start= min(drift_in$GNSS_time_UTC[relevant_drift_index])
