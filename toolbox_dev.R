@@ -1,7 +1,7 @@
 library(dplyr)
 
-setwd('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/')
-
+#setwd('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/')
+setwd('C:/Users/confluence/Desktop/calval_toolbox/')
 #PT paths------------------------------------------
 PT_data_directory='Willamette/Willamette raw PTs/'
 QA_QC_PT_output_directory='Willamette/Willamette munged PTs/'
