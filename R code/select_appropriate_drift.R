@@ -31,6 +31,12 @@ if (nrow(direct_match_drift)==nrow(drift_nodes)){
 indirect_drift= drift_nodes[remove_index,]%>%
   mutate(wse=node_wse)%>%
   select(-X)
+
+#get the 1hz data for those left behind
+drift_1hz=do.call(rbind,lapply(paste0('Willamette/Willamette munged drifts/',
+                                      unique(indirect_drift$drift_ID),'.csv' ),read.csv))%>%
+  mutate(GNSS_time_UTC=as.POSIXct(GNSS_time_UTC))%>%#csv read scrubs date
+  mutate()
 #pull PT levels at SWOT time-----------
 PT_at_SWOT_time= do.call(rbind,lapply(paste0('Willamette/Willamette munged PTs/',list.files('Willamette/Willamette munged PTs/')), read.csv))%>%
   mutate(PT_time_UTC=as.POSIXct(PT_time_UTC))%>%#csv read strips the datetime
@@ -39,12 +45,12 @@ PT_at_SWOT_time= do.call(rbind,lapply(paste0('Willamette/Willamette munged PTs/'
   filter(time_diff_to_SWOT_PT_sec==min(time_diff_to_SWOT_PT_sec))%>%
   ungroup()%>%
   select(-driftID,-X)%>%#this was the drift used to correct it, but taht is ocnfusing here
-  mutate(wse=PT_wse)#for joining
+ mutate(lat=PT_lat,lon=PT_lon) #for joining
 
 #compare drift node levels with PT levels
 #do a difference join based on wse. PT wse vs drift WSW
-drift_pt_join_df= left_join(indirect_drift,PT_at_SWOT_time,
-                                       by='wse', distance_col='wse_difference')%>%
+drift_pt_join_df= geo_left_join(indirect_drift,PT_at_SWOT_time, unit='km',method='haversine',
+                                       distance_col='distance_m')%>%
   
 #now select the closest drift per node
   group_by(node_ID) %>%
