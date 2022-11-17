@@ -73,7 +73,7 @@ if(!identical(unmunged_PTs,character(0))){
 
 #-----------------------------
 
-#calculate slopes and heights within nodes and reaches------
+#calculate slopes and heights from drifts within nodes and reaches------
 
 SWORD_reach= read.csv('Willamette/Willamette nodes.csv')
 this_river_reach_IDs= as.numeric(as.character(unique(SWORD_reach$reach_id)))
@@ -89,8 +89,13 @@ dummy=calculate_sope_wse_fromdrift(SWORD_path=SWORD_path,drift_directory=munged_
                                    this_river_node_IDs=this_river_node_IDs,utm_zone=utm_zone, buffer=buffer,rivername=rivername)
 #-----------------------------
 
+#calculate slopes and heights from PTs within nodes and reaches----
 
+#-----------------------------
 
+#define what drift goes with what SWOT overpass--------------------
+
+#-----------------------------
 
 
 
