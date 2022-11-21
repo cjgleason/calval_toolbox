@@ -1,13 +1,13 @@
 
-#select_appropriate_drift=function(passname,SWOT_time_UTC,time_threshold_sec,wse_threshold_m,distance_threshold_m){
+select_appropriate_drift=function(passname,SWOT_time_UTC,time_threshold_sec,wse_threshold_m,distance_threshold_m){
 
 library(dplyr)
 library(fuzzyjoin)
-passname='fake swot pass ID'
-SWOT_time_UTC=as.POSIXct('2022-07-26 21:44:47')
-time_threshold_sec= 120*60 #two hour
-wse_threshold_m=0.05 #within 5cm
-distance_threshold_m =200 #within 200m
+# passname='fake swot pass ID'
+# SWOT_time_UTC=as.POSIXct('2022-07-26 21:44:47')
+# time_threshold_sec= 120*60 #two hour
+# wse_threshold_m=0.05 #within 5cm
+# distance_threshold_m =200 #within 200m
 
 #FIRST CHECK- if time matches, use the time matched dirft
 #read in node levels from drift
@@ -63,8 +63,8 @@ mutate(wse_difference= GNSS_wse - PT_wse)%>%
   #here, we have now found all drifts within a threshold of the PTs. Since all of these were NOT collected close enough to 
   #SWOT's overpass, we do not need to time match
   
-  #fitlering now by level within a specified distance will give us the abilltiy to find all 'good' matches.
-  filter(wse_difference<wse_threshold_m)%>%
+  #filtering now by level within a specified distance will give us the ability to find all 'good' matches.
+  filter(abs(wse_difference)<wse_threshold_m)%>%
   group_by(drift_ID,add = TRUE)%>%
   #sweet. Now we've got e.g. all drifts within 200m of a PT within 5cm of a PT level.
   transmute(Drift_PT_dist_km=distance_km,wse_difference_m=wse_difference,SWOT_passid=passname,SWOT_time_UTC=SWOT_time_UTC)%>%
@@ -75,4 +75,4 @@ mutate(wse_difference= GNSS_wse - PT_wse)%>%
 #write to file
 write.csv(drift_pt_join_df,paste0('Willamette/SWOT drift pairs/',passname,'matched.csv'))
 
-
+}

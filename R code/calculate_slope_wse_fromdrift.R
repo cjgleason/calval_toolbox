@@ -26,7 +26,6 @@ nodeIDs=ncvar_get(SWORD_in,'nodes/node_id',verbose=FALSE)
 node_index= which(nodeIDs %in% this_river_node_IDs)
 #-----------------------------------------------------
 
-
 #Node variables-------
 #overwriting with the index limits the RAM needed
 node_x=ncvar_get(SWORD_in, 'nodes/x',verbose=FALSE)[node_index]
@@ -163,7 +162,7 @@ calc_node_wse=function(drift_file,node_df,cl_df,zone){
     group_by(node_ID)%>%
     filter(row_number()==1)
   
-  #make drifts spatial
+  #make drifts spatial for point-in-polygon operation
   spatial_drift=st_as_sf(drift_in,coords=c('UTM_x','UTM_y'),crs=paste0('+proj=utm +zone=',zone,' +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs') ) 
   points_in_node=st_intersection(spatial_drift,final_node_df)%>%
     group_by(node_ID)%>%
@@ -198,8 +197,8 @@ calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river
     wse_time_start= min(drift_in$GNSS_time_UTC[relevant_drift_index])
     wse_time_end=max(drift_in$GNSS_time_UTC[relevant_drift_index])
     
-    
-    #take points within some distance of xmin, ymin, xmax, ymax
+    #take points within some distance of xmin, ymin, xmax, ymax to define the slope
+    #we do not use the points in the middle
     #we have a 'buffer' variable for this
     
   this_cl=filter(cl_df,reach_ID==reach_id_search)
@@ -239,7 +238,7 @@ calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river
   slope= (mean(slope_start_elevations)- mean(slope_end_elevations)) / cl_distance
   slope_sd= sqrt(sd(slope_start_elevations)^2+sd(slope_end_elevations)^2)
 
-  if (is.na(slope_sd)){wse_bar=NA}#kluge taht tells us the whole reach wasn't floated
+  if (is.na(slope_sd)){wse_bar=NA}#kluge that tells us the whole reach wasn't floated
     
 
     output=data.frame(reach_ID=reach_id_search,

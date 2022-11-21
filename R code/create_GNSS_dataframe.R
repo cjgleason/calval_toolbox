@@ -1,6 +1,6 @@
 create_GNSS_dataframe= function(log_file,GNSS_drift_data_directory,output_directory){
 library(ncdf4)
-  library(stringr)
+library(stringr)
 
 
 GNSS_nc=nc_open(paste0(GNSS_drift_data_directory,log_file,'.nc'))
@@ -45,6 +45,7 @@ GNSS_log=data.frame(GNSS_Lat=Lat,GNSS_Lon=Lon,GNSS_wse=GNSS_wse,GNSS_time_tai=GN
   filter(GNSS_surf_flag==12)%>%
   filter(GNSS_motion_flag==2)%>%
   mutate(GNSS_ellipsoid=GNSS_ellipsoid)%>%
+  #filter for self ID uncertainty at 5cm
   filter(GNSS_uncertainty<0.05)%>%
   mutate(drift_ID= sub('',"",log_file))
 
