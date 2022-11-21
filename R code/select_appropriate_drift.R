@@ -1,9 +1,13 @@
+
+select_appropriate_drift=function(passname,SWOT_time_UTC,time_threshold_sec,wse_threshold_m,distance_threshold_m){
+
 library(dplyr)
 library(fuzzyjoin)
-passname='fake swot pass ID'
-SWOT_time_UTC=as.POSIXct('2022-07-26 21:44:47')
-time_threshold_sec= 120*60 #two hour
-wse_threshold_m=0.05 #within 5cm
+# passname='fake swot pass ID'
+# SWOT_time_UTC=as.POSIXct('2022-07-26 21:44:47')
+# time_threshold_sec= 120*60 #two hour
+# wse_threshold_m=0.05 #within 5cm
+# distance_threshold_m =200 #within 200m
 
 #FIRST CHECK- if time matches, use the time matched dirft
 #read in node levels from drift
@@ -16,7 +20,8 @@ remove_index =which(drift_nodes$time_diff_to_SWOT_drift_sec>time_threshold_sec)
 
 direct_match_drift=drift_nodes[keep_index,]%>%
   mutate(SWOT_time_UTC=SWOT_time_UTC)%>%
-  mutate(SWOT_passid=passname)
+  mutate(SWOT_passid=passname)%>%
+  select(node_ID,reach_ID,drift_ID,time_diff_to_SWOT_drift_sec,SWOT_time_UTC,SWOT_passid)
 
 #write it to file
 if (nrow(direct_match_drift)>0){
@@ -36,7 +41,7 @@ indirect_drift= drift_nodes[remove_index,]%>%
 drift_1hz=do.call(rbind,lapply(paste0('Willamette/Willamette munged drifts/',
                                       unique(indirect_drift$drift_ID),'.csv' ),read.csv))%>%
   mutate(GNSS_time_UTC=as.POSIXct(GNSS_time_UTC))%>%#csv read scrubs date
-  mutate()
+  mutate(Lon=GNSS_Lon,Lat=GNSS_Lat)
 #pull PT levels at SWOT time-----------
 PT_at_SWOT_time= do.call(rbind,lapply(paste0('Willamette/Willamette munged PTs/',list.files('Willamette/Willamette munged PTs/')), read.csv))%>%
   mutate(PT_time_UTC=as.POSIXct(PT_time_UTC))%>%#csv read strips the datetime
@@ -45,21 +50,29 @@ PT_at_SWOT_time= do.call(rbind,lapply(paste0('Willamette/Willamette munged PTs/'
   filter(time_diff_to_SWOT_PT_sec==min(time_diff_to_SWOT_PT_sec))%>%
   ungroup()%>%
   select(-driftID,-X)%>%#this was the drift used to correct it, but taht is ocnfusing here
- mutate(lat=PT_lat,lon=PT_lon) #for joining
+ mutate(Lat=PT_lat,Lon=PT_lon) #for joining
 
 #compare drift node levels with PT levels
-#do a difference join based on wse. PT wse vs drift WSW
-drift_pt_join_df= geo_left_join(indirect_drift,PT_at_SWOT_time, unit='km',method='haversine',
-                                       distance_col='distance_m')%>%
+#do a difference join based lat/lon. Slow.
+
+drift_pt_join_df= geo_left_join(drift_1hz,PT_at_SWOT_time, by=c('Lon','Lat'),unit='km',method='haversine',
+                                       distance_col='distance_km') %>% #this is a nearest neighbor join
+mutate(wse_difference= GNSS_wse - PT_wse)%>%
+  group_by(PT_serial) %>%
+  filter(distance_km<distance_threshold_m/1000)%>%
+  #here, we have now found all drifts within a threshold of the PTs. Since all of these were NOT collected close enough to 
+  #SWOT's overpass, we do not need to time match
   
-#now select the closest drift per node
-  group_by(node_ID) %>%
-  filter(wse_difference==min(wse_difference))%>%
-  ungroup()%>%
+  #fitlering now by level within a specified distance will give us the abilltiy to find all 'good' matches.
   filter(wse_difference<wse_threshold_m)%>%
-  select(node_ID,node_wse,node_wse_sd,time,reach_ID,drift_ID,
-         time_diff_to_SWOT_drift_sec,wse_difference)%>%#there are ambigous, as they aren't node products
-  mutate(SWOT_passid=passname)%>%
-mutate(SWOT_time_UTC=SWOT_time_UTC)
+  group_by(drift_ID,add = TRUE)%>%
+  #sweet. Now we've got e.g. all drifts within 200m of a PT within 5cm of a PT level.
+  transmute(Drift_PT_dist_km=distance_km,wse_difference_m=wse_difference,SWOT_passid=passname,SWOT_time_UTC=SWOT_time_UTC)%>%
+  summarize(Drift_PT_dist_km=mean(Drift_PT_dist_km),wse_dffierence_m_bar=mean(wse_difference_m),
+            wse_dffierence_m_sd=sd(wse_difference_m),SWOT_passid=first(SWOT_passid),SWOT_time_UTC=first(SWOT_time_UTC))
+  
+
 #write to file
 write.csv(drift_pt_join_df,paste0('Willamette/SWOT drift pairs/',passname,'matched.csv'))
+
+}

@@ -44,6 +44,8 @@ correct_PT_to_GNSS= function(raw_PT_file,PT_key_file,dist_thresh,time_thresh,PT_
     #----------------------------
   } # end PT function
   correct_PT=function(prepped_PT,dist_thresh,time_thresh,GNSS_drift_data_directory){
+    
+   
     log_files= unique(prepped_PT$driftID) #the second from the join.
     if(length(log_files)==0){
       return(NA)
@@ -61,6 +63,7 @@ correct_PT_to_GNSS= function(raw_PT_file,PT_key_file,dist_thresh,time_thresh,PT_
 
       #half a second faster to join first on time and then on space
       clean_PT_time=difference_inner_join(prepped_PT,GNSS_log,by='datetime',max_dist=time_thresh)
+    
       #need lon then lat
      distance_m=geodist(cbind(clean_PT_time$PT_lon, clean_PT_time$PT_lat), cbind(clean_PT_time$GNSS_Lon, clean_PT_time$GNSS_Lat), paired=TRUE,measure='haversine')
       
@@ -107,6 +110,7 @@ correct_PT_to_GNSS= function(raw_PT_file,PT_key_file,dist_thresh,time_thresh,PT_
  
     }
     
+
     
     #loop through the log files, find the right GNSS data to associate with the install,
     # average the GNSS heigh within a distance theshold, and then create a corrected PT df
@@ -144,15 +148,6 @@ if (all(is.na(offset_PT))){
   saveRDS(output,file=paste0(flagged_PT_output_directory,filename,'_',prepped_PT$PT_Serial[1],'.rds'))
   return(NA)}
 # 
-
-
-  # if(nrow(offset_PT)==0){
-  #   print('I was asked to find a drift file that doesnt exist')
-  #   output='I was asked to find a drift file that doesnt exist'
-  #   saveRDS(output,file=paste0(flagged_PT_output_directory,filename,'_',prepped_PT$PT_Serial[1],'.rds'))
-  #   return(NA)}
-
-   
 
 
   if (nrow(offset_PT)<5 ){
@@ -205,23 +200,23 @@ if (all(is.na(offset_PT))){
   
   #first strip the offest df into just the GNSS time and the PT correction and SD
    svelte_offset_PT=select(offset_PT,PT_correction,PT_wse_sd,GNSS_time_UTC)
-  
-   
-  final_PT =  nearestTime(prepped_PT,svelte_offset_PT,'PT_time_UTC','GNSS_time_UTC')%>%
-    #drop PT data before instal' time
-    mutate(timediff_install=PT_install_UTC-PT_time_UTC)%>%
-    filter(timediff_install<0)%>%
-  #drop PT data after uninstall time
-    mutate(timediff_uninstall=PT_uninstall_UTC-PT_time_UTC)%>%
-    filter(timediff_uninstall>0)%>%
-    select(-timediff_install,-timediff_uninstall)%>%
-    mutate(PT_wse=PT_level+PT_correction)
+   timenow=Sys.time()
+
+   final_PT =  nearestTime(prepped_PT,svelte_offset_PT,'PT_time_UTC','GNSS_time_UTC')%>%
+     #drop PT data before instal' time
+     mutate(timediff_install=PT_install_UTC-PT_time_UTC)%>%
+     filter(timediff_install<0)%>%
+     #drop PT data after uninstall time
+     mutate(timediff_uninstall=PT_uninstall_UTC-PT_time_UTC)%>%
+     filter(timediff_uninstall>0)%>%
+     select(-timediff_install,-timediff_uninstall)%>%
+     mutate(PT_wse=PT_level+PT_correction)
   
 
-
+    print(Sys.time()-timenow)
     print(filename)
     print('this file passed all checks')
-    write.csv(final_PT,file=paste0(QA_QC_PT_output_directory,filename,'_',final_PT$PT_Serial[1],'.csv'))
+    write.csv(final_PT,file=paste0(QA_QC_PT_output_directory,filename,'.csv'))
 
 
   

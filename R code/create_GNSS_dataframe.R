@@ -1,7 +1,6 @@
 create_GNSS_dataframe= function(log_file,GNSS_drift_data_directory,output_directory){
 library(ncdf4)
   library(stringr)
-#log_file=unmunged_drifts[1]
 
 
 GNSS_nc=nc_open(paste0(GNSS_drift_data_directory,log_file,'.nc'))

@@ -1,7 +1,7 @@
 library(dplyr)
 
-#setwd('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/')
-setwd('C:/Users/confluence/Desktop/calval_toolbox/')
+setwd('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/')
+#setwd('C:/Users/confluence/Desktop/calval_toolbox/')
 #PT paths------------------------------------------
 PT_data_directory='Willamette/Willamette raw PTs/'
 QA_QC_PT_output_directory='Willamette/Willamette munged PTs/'
@@ -29,8 +29,8 @@ output_directory='Willamette/SWORD products/'
 #pull filename before the .csv
 raw_GNSS=sub( "\\..*","", list.files(GNSS_drift_data_directory))
 #pull filename before the second _
-QA_QC_drifts=sub('_([^_]*)$',"",list.files(QA_QC_drift_output_directory))
-flagged_drifts=sub('_([^_]*)$',"",list.files(flagged_drift_output_directory))
+QA_QC_drifts=sub( "\\..*","",list.files(QA_QC_drift_output_directory))
+flagged_drifts=sub("\\..*","",list.files(flagged_drift_output_directory))
 #what raw drift data have not been munged
 unmunged_drifts=setdiff(raw_GNSS,c(flagged_drifts,QA_QC_drifts))
 
@@ -55,8 +55,8 @@ change_thresh_15_min=0.05#m- does it change more than 5cm in 15 minutes? that is
 #pull filename before the .csv
 raw_PT=sub( "\\..*","", list.files(PT_data_directory))
 #pull filename before the second _
-QA_QC_PTs=sub('_([^_]*)$',"",list.files(QA_QC_PT_output_directory))
-flagged_PTs=sub('_([^_]*)$',"",list.files(flagged_PT_output_directory))
+QA_QC_PTs=sub( "\\..*","",list.files(QA_QC_PT_output_directory))
+flagged_PTs=sub( "\\..*","",list.files(flagged_PT_output_directory))
 #what raw PT data have not been munged
 unmunged_PTs=setdiff(raw_PT,c(flagged_PTs,QA_QC_PTs))
 #run the PTs that are not yet munged
@@ -94,7 +94,14 @@ dummy=calculate_sope_wse_fromdrift(SWORD_path=SWORD_path,drift_directory=munged_
 #-----------------------------
 
 #define what drift goes with what SWOT overpass--------------------
+passname='fake swot pass ID'
+SWOT_time_UTC=as.POSIXct('2022-07-26 21:44:47')
+time_threshold_sec= 120*60 #two hour
+wse_threshold_m=0.05 #within 5cm
+distance_threshold_m =200 #within 200m
+source('R code/select_appropriate_drift.R')
 
+dummy=select_appropriate_drift(passname,SWOT_time_UTC,time_threshold_sec,wse_threshold_m,distance_threshold_m)
 #-----------------------------
 
 
