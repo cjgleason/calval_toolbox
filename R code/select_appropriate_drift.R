@@ -1,13 +1,13 @@
 
-select_appropriate_drift=function(passname,SWOT_time_UTC,time_threshold_sec,wse_threshold_m,distance_threshold_m){
+#select_appropriate_drift=function(passname,SWOT_time_UTC,time_threshold_sec,wse_threshold_m,distance_threshold_m){
 
 library(dplyr)
 library(fuzzyjoin)
-# passname='fake swot pass ID'
-# SWOT_time_UTC=as.POSIXct('2022-07-26 21:44:47')
-# time_threshold_sec= 120*60 #two hour
-# wse_threshold_m=0.05 #within 5cm
-# distance_threshold_m =200 #within 200m
+passname='fake swot pass ID'
+SWOT_time_UTC=as.POSIXct('2022-07-26 21:44:47')
+time_threshold_sec= 120*60 #two hour
+wse_threshold_m=0.05 #within 5cm
+distance_threshold_m =200 #within 200m
 
 #FIRST CHECK- if time matches, use the time matched dirft
 #read in node levels from drift
@@ -75,4 +75,4 @@ mutate(wse_difference= GNSS_wse - PT_wse)%>%
 #write to file
 write.csv(drift_pt_join_df,paste0('Willamette/SWOT drift pairs/',passname,'matched.csv'))
 
-}
+
