@@ -63,8 +63,8 @@ mutate(wse_difference= GNSS_wse - PT_wse)%>%
   #here, we have now found all drifts within a threshold of the PTs. Since all of these were NOT collected close enough to 
   #SWOT's overpass, we do not need to time match
   
-  #fitlering now by level within a specified distance will give us the abilltiy to find all 'good' matches.
-  filter(wse_difference<wse_threshold_m)%>%
+  #filtering now by level within a specified distance will give us the ability to find all 'good' matches.
+  filter(abs(wse_difference)<wse_threshold_m)%>%
   group_by(drift_ID,add = TRUE)%>%
   #sweet. Now we've got e.g. all drifts within 200m of a PT within 5cm of a PT level.
   transmute(Drift_PT_dist_km=distance_km,wse_difference_m=wse_difference,SWOT_passid=passname,SWOT_time_UTC=SWOT_time_UTC)%>%
