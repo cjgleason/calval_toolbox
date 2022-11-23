@@ -91,7 +91,15 @@ dummy=calculate_sope_wse_fromdrift(SWORD_path=SWORD_path,drift_directory=munged_
 #-----------------------------
 
 #calculate slopes and heights from PTs within nodes and reaches----
+keyfile='Willamette/WM_Key.csv'
+PT_files=paste0('Willamette/Willamette munged PTs/',list.files('Willamette/Willamette munged PTs/'))
+SWORD_path='na_sword_v11.nc'
+SWORD_reach= read.csv('Willamette/Willamette nodes.csv')
+this_river_reach_IDs= as.numeric(as.character(unique(SWORD_reach$reach_id)))
+source('R code/calculate_slope_wse_fromPT.R')
 
+dummy=calculate_slope_wse_fromPT(keyfile=keyfile,PT_files=PT_files,SWORD_path=SWORD_path,
+                                 SWORD_reach=SWORD_reach,this_river_reach_IDs=this_river_reach_IDs)
 #-----------------------------
 
 #define what drift goes with what SWOT overpass--------------------
@@ -100,9 +108,11 @@ SWOT_time_UTC=as.POSIXct('2022-07-26 21:44:47')
 time_threshold_sec= 120*60 #two hour
 wse_threshold_m=0.05 #within 5cm
 distance_threshold_m =200 #within 200m
+keyfile='Willamette/WM_Key.csv'
 source('R code/select_appropriate_drift.R')
 
-dummy=select_appropriate_drift(passname,SWOT_time_UTC,time_threshold_sec,wse_threshold_m,distance_threshold_m)
+dummy=select_appropriate_drift(passname=passname,SWOT_time_UTC=SWOT_time_UTC,time_threshold_sec=time_threshold_sec,
+                               wse_threshold_m= wse_threshold_m,distance_threshold_m=distance_threshold_m,keyfile=keyfile)
 #-----------------------------
 
 
