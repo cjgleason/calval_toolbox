@@ -135,8 +135,12 @@ distance_threshold_m =200 #within 200m
 keyfile='Willamette/WM_Key.csv'
 source('R code/select_appropriate_drift.R')
 
-dummy=select_appropriate_drift(passname=passname,SWOT_time_UTC=SWOT_time_UTC,time_threshold_sec=time_threshold_sec,
-                               wse_threshold_m= wse_threshold_m,distance_threshold_m=distance_threshold_m,keyfile=keyfile)
+dummy=select_appropriate_drift(passname=passname,
+                               swot_time_UTC=SWOT_time_UTC,
+                               time_threshold_sec=time_threshold_sec,
+                               wse_threshold_m= wse_threshold_m,
+                               distance_threshold_m=distance_threshold_m,
+                               keyfile=keyfile)
 #-----------------------------
 
 

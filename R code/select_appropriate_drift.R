@@ -22,7 +22,8 @@ remove_index =which(drift_nodes$time_diff_to_swot_drift_sec>time_threshold_sec)
 direct_match_drift=drift_nodes[keep_index,]%>%
   mutate(swot_time_UTC=swot_time_UTC)%>%
   mutate(swot_passid=passname)%>%
-  transmute(node_id=node_id,reach_id=reach_id,drift_id=drift_id,time_diff_to_swot_drift_sec,swot_time_UTC,swot_passid)
+  transmute(node_id=as.character(format(node_id,scientific=FALSE)),reach_id=as.character(format(reach_id,scientific=FALSE)),
+            drift_id=drift_id,time_diff_to_swot_drift_sec,swot_time_UTC,swot_passid)
 
 #write it to file
 if (nrow(direct_match_drift)>0){
@@ -41,8 +42,8 @@ indirect_drift= drift_nodes[remove_index,]%>%
 #get the 1hz data for those left behind
 drift_1hz=do.call(rbind,lapply(paste0('Willamette/Willamette munged drifts/',
                                       unique(indirect_drift$drift_id),'.csv' ),read.csv))%>%
-  mutate(GNSS_time_UTC=as.POSIXct(GNSS_time_UTC))%>%#csv read scrubs date
-  mutate(Lon=GNSS_Lon,Lat=GNSS_Lat)
+  mutate(gnss_time_UTC=as.POSIXct(gnss_time_UTC))%>%#csv read scrubs date
+  mutate(Lon=gnss_Lon,Lat=gnss_Lat)
 #pull pt levels at swot time-----------
 pt_at_swot_time= do.call(rbind,lapply(paste0('Willamette/Willamette munged pts/',list.files('Willamette/Willamette munged pts/')), read.csv))%>%
   mutate(pt_time_UTC=as.POSIXct(pt_time_UTC))%>%#csv read strips the datetime
@@ -50,7 +51,7 @@ pt_at_swot_time= do.call(rbind,lapply(paste0('Willamette/Willamette munged pts/'
   mutate(time_diff_to_swot_pt_sec=abs(pt_time_UTC-swot_time_UTC))%>%
   filter(time_diff_to_swot_pt_sec==min(time_diff_to_swot_pt_sec))%>%
   ungroup()%>%
-  select(-driftid,-X)%>%#this was the drift used to correct it, but taht is ocnfusing here
+  select(-driftID,-X)%>%#this was the drift used to correct it, but taht is ocnfusing here
  mutate(Lat=pt_lat,Lon=pt_lon) #for joining
 
 #compare drift node levels with pt levels
@@ -58,14 +59,13 @@ pt_at_swot_time= do.call(rbind,lapply(paste0('Willamette/Willamette munged pts/'
 
 #read in key df first
 key_df=read.csv(keyfile)%>%
-  select(pt_Serial,node_id,reach_id)%>%
-  mutate(pt_serial=pt_Serial)%>%
-  select(-pt_Serial)
+  select(PT_Serial,Node_ID,Reach_ID)%>%
+  transmute(pt_serial=PT_Serial,node_id=Node_ID,reach_id=Reach_ID)
 
 
 drift_pt_join_df= geo_left_join(drift_1hz,pt_at_swot_time, by=c('Lon','Lat'),unit='km',method='haversine',
                                        distance_col='distance_km') %>% #this is a nearest neighbor join
-mutate(wse_difference= GNSS_wse - pt_wse)%>%
+mutate(wse_difference= gnss_wse - pt_wse)%>%
   left_join(key_df,by='pt_serial')%>%
   group_by(pt_serial,node_id,drift_id) %>%
   filter(distance_km<distance_threshold_m/1000)%>%
@@ -79,10 +79,13 @@ mutate(wse_difference= GNSS_wse - pt_wse)%>%
   group_by(node_id,drift_id) %>%
   transmute(drift_pt_dist_km_bar=distance_km,wse_difference_m=wse_difference,swot_passid=passname,
             swot_time_UTC=swot_time_UTC)%>%
-  summarize(drift_pt_dist_km_bar=mean(Drift_pt_dist_km_bar),wse_dffierence_m_bar=mean(wse_difference_m),
-            wse_dffierence_m_sd=sd(wse_difference_m),swot_passid=first(swot_passid),
+  summarize(drift_pt_dist_km_bar=mean(drift_pt_dist_km_bar),
+            wse_difference_m_bar=mean(wse_difference_m),
+            wse_difference_m_sd=sd(wse_difference_m),
+            swot_passid=first(swot_passid),
             swot_time_UTC=first(swot_time_UTC))%>%
   mutate(node_id=as.character(node_id))
+
 
   
 
