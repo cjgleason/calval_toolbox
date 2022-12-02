@@ -75,7 +75,7 @@ mutate(wse_difference= gnss_wse - pt_wse)%>%
   #filtering now by level within a specified distance will give us the ability to find all 'good' matches.
   filter(abs(wse_difference)<wse_threshold_m)%>%
   #sweet. Now we've got e.g. all drifts within 200m of a pt within 5cm of a pt level. grouping by pts did the wse error by pt
-  #now we will summarize those perpt errors within each node and drift
+  #now we will summarize those per pt errors within each node and drift
   group_by(node_id,drift_id) %>%
   transmute(drift_pt_dist_km_bar=distance_km,wse_difference_m=wse_difference,swot_passid=passname,
             swot_time_UTC=swot_time_UTC)%>%
