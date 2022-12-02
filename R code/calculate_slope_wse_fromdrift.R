@@ -1,7 +1,6 @@
 calculate_sope_wse_fromdrift=function(SWORD_path,drift_directory,PT_directory,output_directory,this_river_reach_ids,this_river_node_ids,
                                        utm_zone, buffer,rivername){
   
-  library(ncdf4)
   library(sf)
   library(dplyr)
   library(rgdal)
@@ -38,8 +37,11 @@ node_length=ncvar_get(SWORD_in, 'nodes/node_length',verbose=FALSE)[node_index]
 
 node_reachid=ncvar_get(SWORD_in, 'nodes/reach_id',verbose=FALSE)[node_index] #key field
 
+node_nodeid=nodeids[node_index]
 
-node_df=data.frame(lon=node_x,lat=node_y,node_id=this_river_node_ids,node_wmax=node_max_width,node_length=node_length,reach_id=node_reachid)
+
+node_df=data.frame(lon=node_x,lat=node_y,node_id=node_nodeid,node_wmax=node_max_width,
+                   node_length=node_length,reach_id=node_reachid)
 
 node_df= node_df%>%
   mutate(node_UTM_x=LongLatToUTM(node_df$lon,node_df$lat,utm_zone)[,1])%>%
@@ -62,8 +64,9 @@ reach_y_min=ncvar_get(SWORD_in, 'reaches/y_min',verbose=FALSE)[reach_index]
 
 reach_length=ncvar_get(SWORD_in, 'reaches/reach_length',verbose=FALSE)[reach_index]
 
+reach_reachid=reachids[reach_index]
 
-reach_df=data.frame(lon=reach_x,lat=reach_y,reach_id=this_river_reach_ids,reach_xmax=reach_x_max,reach_xmin=reach_x_min,
+reach_df=data.frame(lon=reach_x,lat=reach_y,reach_id=reach_reachid,reach_xmax=reach_x_max,reach_xmin=reach_x_min,
                     reach_ymax=reach_y_max,reach_ymin=reach_y_min, reach_length=reach_length)
 
 
@@ -166,7 +169,11 @@ calc_node_wse=function(drift_file,node_df,cl_df,zone){
   spatial_drift=st_as_sf(drift_in,coords=c('UTM_x','UTM_y'),crs=paste0('+proj=utm +zone=',zone,' +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs') ) 
   points_in_node=st_intersection(spatial_drift,final_node_df)%>%
     group_by(node_id)%>%
-    summarize(node_wse=mean(gnss_wse,na.rm=T),node_wse_sd=sd(gnss_wse,na.rm=T),time=mean(gnss_time_UTC),reach_id=reach_id[1],drift_id=drift_id[1])
+    summarize(node_wse=mean(gnss_wse,na.rm=T),
+              node_wse_precision_m=0.05,# JPL wants precision, not variance. sd(gnss_wse,na.rm=T),
+              time=mean(gnss_time_UTC),
+              reach_id=reach_id[1],
+              drift_id=drift_id[1])
     
 
 }
@@ -191,9 +198,22 @@ calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river
                                   drift_in$gnss_Lon<reach_id_filtered$reach_xmax)
     
     filtered_drift=drift_in[relevant_drift_index,]
+    
+    if (nrow(filtered_drift)==0){
+      output=data.frame(reach_id=reach_id_search,
+                        wse_bar=NA,
+                        wse_precision=NA,
+                        wse_start= as.POSIXct('2000-01-01 12:00:00'),
+                        wse_end= as.POSIXct('2000-01-01 12:00:00'),
+                        slope= NA,
+                        slope_precision=NA,
+                        drift_id=drift_file)
+      
+      return(output)
+    }
 
     reach_wse_bar_m=mean(drift_in$gnss_wse[relevant_drift_index],na.rm=T)
-    reach_wse_sd_m =sd(drift_in$gnss_wse[relevant_drift_index],na.rm=T)
+    reach_wse_precision_m =0.05 # JPL wants precision, not variance. sd(drift_in$gnss_wse[relevant_drift_index],na.rm=T)
     wse_time_start= min(drift_in$gnss_time_UTC[relevant_drift_index])
     wse_time_end=max(drift_in$gnss_time_UTC[relevant_drift_index])
     
@@ -241,21 +261,26 @@ calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river
   if (is.na(slope_sd)){wse_bar=NA}#kluge that tells us the whole reach wasn't floated
     
 
+
     output=data.frame(reach_id=reach_id_search,
                       wse_bar=reach_wse_bar_m,
-                      wse_sd=reach_wse_sd_m,
+                      wse_precision=reach_wse_precision_m,
                       wse_start= wse_time_start,
                       wse_end= wse_time_end,
                       slope= slope,
-                      slope_sd=slope_sd,
+                      slope_precision=slope_sd,
                       drift_id=drift_file)
+    
+    #print(output)
   }
   
   
   reach_ids=this_river_reach_ids
   
   output1 = do.call(rbind,lapply(reach_ids,calc_wse_stats,drift_in=drift_in,spatial_reach=spatial_reach,buffer=buffer))%>%
-    filter(!is.na(wse_bar))
+     filter(!is.na(wse_bar))
+  
+
   
 }
 #------------------------------------------------------
@@ -278,7 +303,7 @@ node_wses=as.data.frame(node_wses)%>%
 reach_stats=do.call(rbind,lapply(drifts,calc_reach_stats,spatial_reach=spatial_reach,
                                  buffer=buffer,cl_df=cl_df,zone=utm_zone,this_river_reach_ids=this_river_reach_ids))%>%
   mutate(reach_id=format(reach_id,scientific = FALSE))%>%
-  filter(!is.na(slope_sd))
+  filter(!is.na(slope_precision))
 
 
 

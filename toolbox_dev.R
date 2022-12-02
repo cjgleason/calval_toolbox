@@ -1,10 +1,11 @@
 library(dplyr)
+library(parallel)
 
-setwd('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/')
+#setwd('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/')
 #setwd('C:/Users/confluence/Desktop/calval_toolbox/')
-#setwd('C:/Users/colin/Documents/GitHub/calval_toolbox/')
+setwd('C:/Users/colin/Desktop/calval_toolbox/')
 
-#PT paths------------------------------------------
+#PT paths
 PT_data_directory='Willamette/Willamette raw PTs/'
 QA_QC_PT_output_directory='Willamette/Willamette munged PTs/'
 flagged_PT_output_directory='Willamette/Willamette flagged PTs/'
@@ -18,7 +19,7 @@ flagged_drift_output_directory='Willamette/Willamette flagged drifts/'
 #--------------------------------------------------
 
 #sword paths----------------------------------------
-SWORD_path='na_sword_v11.nc'
+SWORD_path='na_sword_v14.nc'
 munged_drift_directory='Willamette/Willamette munged drifts/'
 PT_directory='Willamette/Willamette munged PTs/'
 output_directory='Willamette/SWORD products/'
@@ -38,9 +39,11 @@ unmunged_drifts=setdiff(raw_GNSS,c(flagged_drifts,QA_QC_drifts))
 
 if(!identical(unmunged_drifts,character(0))){
   source('R code/create_GNSS_dataframe.R')
+  cl=makeCluster(16)
   
-  dummy=lapply(unmunged_drifts,create_GNSS_dataframe,
-               GNSS_drift_data_directory=GNSS_drift_data_directory,output_directory=QA_QC_drift_output_directory)
+  dummy=parLapply(cl=cl,unmunged_drifts,create_gnss_dataframe,
+               gnss_drift_data_directory=GNSS_drift_data_directory,output_directory=QA_QC_drift_output_directory)
+  stopCluster(cl)
 }
 
 #-------------------------------------------------
@@ -66,13 +69,22 @@ unmunged_PTs=setdiff(raw_PT,c(flagged_PTs,QA_QC_PTs))
 
 if(!identical(unmunged_PTs,character(0))){
   source('R code/correct_PT_to_GNSS.R')
-  library(parallel)
-  cl=makeCluster(20)
 
-  dummy=lapply(unmunged_PTs,correct_PT_to_GNSS,PT_key_file=PT_key_file,dist_thresh=dist_thresh,
-               time_thresh=time_thresh,PT_data_directory=PT_data_directory,GNSS_drift_data_directory=QA_QC_drift_output_directory,
-               QA_QC_PT_output_directory=QA_QC_PT_output_directory,flagged_PT_directory=flagged_PT_directory,
-               GNSS_sd_thresh=GNSS_sd_thresh,offset_diff_thresh=offset_diff_thresh,change_thresh_15_min=change_thresh_15_min)
+  cl=makeCluster(16)
+
+  dummy=parLapply(cl,unmunged_PTs,correct_pt_to_gnss,
+               pt_key_file=PT_key_file,
+               dist_thresh=dist_thresh,
+               time_thresh=time_thresh,
+               pt_data_directory=PT_data_directory,
+               gnss_drift_data_directory=QA_QC_drift_output_directory,
+               QA_QC_pt_output_directory=QA_QC_PT_output_directory,
+               flagged_pt_output_directory=flagged_PT_output_directory,
+               gnss_sd_thresh=GNSS_sd_thresh,
+               offset_sd_thresh=offset_sd_thresh,
+               change_thresh_15_min=change_thresh_15_min)
+  
+  stopCluster(cl)
 }
 
 #-----------------------------
@@ -83,14 +95,20 @@ SWORD_reach= read.csv('Willamette/Willamette nodes.csv')
 this_river_reach_IDs= as.numeric(as.character(unique(SWORD_reach$reach_id)))
 this_river_node_IDs= as.numeric(as.character(unique(SWORD_reach$node_id)))
 utm_zone=10
-buffer=500 #m, 'extends' the reach
+buffer=30 #m, 'extends' the reach
 rivername='Willamette'
 
 source('R code/calculate_slope_wse_fromdrift.R')
 
-dummy=calculate_sope_wse_fromdrift(SWORD_path=SWORD_path,drift_directory=munged_drift_directory,PT_directory=PT_directory,
-                                   output_directory=output_directory,this_river_reach_IDs=this_river_reach_IDs,
-                                   this_river_node_IDs=this_river_node_IDs,utm_zone=utm_zone, buffer=buffer,rivername=rivername)
+dummy=calculate_sope_wse_fromdrift(SWORD_path=SWORD_path,
+                                   drift_directory=munged_drift_directory,
+                                   PT_directory=PT_directory,
+                                   output_directory=output_directory,
+                                   this_river_reach_ids=this_river_reach_IDs,
+                                   this_river_node_ids=this_river_node_IDs,
+                                   utm_zone=utm_zone, 
+                                   buffer=buffer,
+                                   rivername=rivername)
 #-----------------------------
 
 #calculate slopes and heights from PTs within nodes and reaches----
@@ -101,8 +119,11 @@ SWORD_reach= read.csv('Willamette/Willamette nodes.csv')
 this_river_reach_IDs= as.numeric(as.character(unique(SWORD_reach$reach_id)))
 source('R code/calculate_slope_wse_fromPT.R')
 
-dummy=calculate_slope_wse_fromPT(keyfile=keyfile,pt_files=PT_files,SWORD_path=SWORD_path,
-                                 SWORD_reach=SWORD_reach,this_river_reach_ids=this_river_reach_IDs)
+dummy=calculate_slope_wse_fromPT(keyfile=keyfile,
+                                 pt_files=PT_files,
+                                 SWORD_path=SWORD_path,
+                                 SWORD_reach=SWORD_reach,
+                                 this_river_reach_ids=this_river_reach_IDs)
 #-----------------------------
 
 #define what drift goes with what SWOT overpass--------------------
