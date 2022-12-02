@@ -1,9 +1,9 @@
-create_GNSS_dataframe= function(log_file,GNSS_drift_data_directory,output_directory){
+create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_directory){
 library(ncdf4)
 library(stringr)
 
 
-GNSS_nc=nc_open(paste0(GNSS_drift_data_directory,log_file,'.nc'))
+gnss_nc=nc_open(paste0(gnss_drift_data_directory,log_file,'.nc'))
 # variables we need
 # wse- water surface height wrt geoid. All JPL corrections applied
 # longitude- longitude
@@ -13,18 +13,18 @@ GNSS_nc=nc_open(paste0(GNSS_drift_data_directory,log_file,'.nc'))
 #surface type flag - 10, 11, or 12. Simialrly, only code 12 incicates quality data
 
 
-Lat=ncvar_get(GNSS_nc,'latitude')
-Lon=ncvar_get(GNSS_nc,'longitude')
-GNSS_wse= ncvar_get(GNSS_nc,'wse')
-GNSS_time_tai=ncvar_get(GNSS_nc,'time_tai')
-GNSS_motion_flag  =ncvar_get(GNSS_nc,'motioncode_flag')
-GNSS_surf_flag  =ncvar_get(GNSS_nc,'surfacetype_flag')
-GNSS_ellipsoid= paste(ncatt_get(GNSS_nc,0,'ellipsoid_semi_major_axis')$value,ncatt_get(GNSS_nc,0,'ellipsoid_flattening')$value,sep=",")
-GNSS_uncertainty=ncvar_get(GNSS_nc,'position_3drss_formal_error')
+Lat=ncvar_get(gnss_nc,'latitude')
+Lon=ncvar_get(gnss_nc,'longitude')
+gnss_wse= ncvar_get(gnss_nc,'wse')
+gnss_time_tai=ncvar_get(gnss_nc,'time_tai')
+gnss_motion_flag  =ncvar_get(gnss_nc,'motioncode_flag')
+gnss_surf_flag  =ncvar_get(gnss_nc,'surfacetype_flag')
+gnss_ellipsoid= paste(ncatt_get(gnss_nc,0,'ellipsoid_semi_major_axis')$value,ncatt_get(gnss_nc,0,'ellipsoid_flattening')$value,sep=",")
+gnss_uncertainty=ncvar_get(gnss_nc,'position_3drss_formal_error')
 
-Info_event=ncvar_get(GNSS_nc,'infoEventDescription')
-Info_event_start=ncvar_get(GNSS_nc,'infoEventStartTime')
-Info_event_end=ncvar_get(GNSS_nc,'infoEventEndTime')
+Info_event=ncvar_get(gnss_nc,'infoEventDescription')
+Info_event_start=ncvar_get(gnss_nc,'infoEventStartTime')
+Info_event_end=ncvar_get(gnss_nc,'infoEventEndTime')
 
 Info_df=data.frame(Event_code=Info_event, Event_start= Info_event_start, Event_end=Info_event_end)%>%
   mutate(Event_start_UTC = as.POSIXct(Event_start,origin='2000-01-01 00:00:00',tz='UTC'))%>%
@@ -37,33 +37,33 @@ Info_df=data.frame(Event_code=Info_event, Event_start= Info_event_start, Event_e
 
 
 
-GNSS_log=data.frame(GNSS_Lat=Lat,GNSS_Lon=Lon,GNSS_wse=GNSS_wse,GNSS_time_tai=GNSS_time_tai,GNSS_uncertainty=GNSS_uncertainty,
-                    GNSS_surf_flag=GNSS_surf_flag,GNSS_motion_flag=GNSS_motion_flag)%>%
+gnss_log=data.frame(gnss_Lat=Lat,gnss_Lon=Lon,gnss_wse=gnss_wse,gnss_time_tai=gnss_time_tai,gnss_uncertainty_m=gnss_uncertainty,
+                    gnss_surf_flag=gnss_surf_flag,gnss_motion_flag=gnss_motion_flag)%>%
   #R's native POSIXCT also doesn't have leap seconds, so we're good
-  mutate(GNSS_time_UTC = as.POSIXct(GNSS_time_tai,origin='2000-01-01 00:00:00',tz='UTC' ))%>%
+  mutate(gnss_time_UTC = as.POSIXct(gnss_time_tai,origin='2000-01-01 00:00:00',tz='UTC' ))%>%
   #need this to join, but let's presrve original
-  filter(GNSS_surf_flag==12)%>%
-  filter(GNSS_motion_flag==2)%>%
-  mutate(GNSS_ellipsoid=GNSS_ellipsoid)%>%
+  filter(gnss_surf_flag==12)%>%
+  filter(gnss_motion_flag==2)%>%
+  mutate(gnss_ellipsoid=gnss_ellipsoid)%>%
   #filter for self ID uncertainty at 5cm
-  filter(GNSS_uncertainty<0.05)%>%
-  mutate(drift_ID= sub('',"",log_file))
+  filter(gnss_uncertainty<0.05)%>%
+  mutate(drift_id= sub('',"",log_file))
 
 #need to recurse this, so a for loop is actually needed!
 for(i in 1:nrow(Info_df)){
-  GNSS_log=filter(GNSS_log, GNSS_time_UTC >= Info_df$Event_end_UTC[i] | GNSS_time_UTC <= Info_df$Event_start_UTC[i] )
+  gnss_log=filter(gnss_log, gnss_time_UTC >= Info_df$Event_end_UTC[i] | gnss_time_UTC <= Info_df$Event_start_UTC[i] )
   
 }
 
-if (nrow(GNSS_log)==0){
+if (nrow(gnss_log)==0){
   print(paste('filename',log_file,'bonked'))
   return(NA)
 }
 
-plot(GNSS_log$GNSS_time_UTC,GNSS_log$GNSS_wse)
+plot(gnss_log$gnss_time_UTC,gnss_log$gnss_wse)
 
-nc_close(GNSS_nc)
+nc_close(gnss_nc)
 
 print(paste0(output_directory,log_file,'.csv'))
 
-write.csv(GNSS_log,paste0(output_directory,log_file,'.csv'))}
+write.csv(gnss_log,paste0(output_directory,log_file,'.csv'))}

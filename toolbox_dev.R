@@ -1,8 +1,9 @@
 library(dplyr)
 
-#setwd('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/')
+setwd('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/')
 #setwd('C:/Users/confluence/Desktop/calval_toolbox/')
-setwd('C:/Users/colin/Documents/GitHub/calval_toolbox/')
+#setwd('C:/Users/colin/Documents/GitHub/calval_toolbox/')
+
 #PT paths------------------------------------------
 PT_data_directory='Willamette/Willamette raw PTs/'
 QA_QC_PT_output_directory='Willamette/Willamette munged PTs/'
@@ -65,7 +66,9 @@ unmunged_PTs=setdiff(raw_PT,c(flagged_PTs,QA_QC_PTs))
 
 if(!identical(unmunged_PTs,character(0))){
   source('R code/correct_PT_to_GNSS.R')
-  
+  library(parallel)
+  cl=makeCluster(20)
+
   dummy=lapply(unmunged_PTs,correct_PT_to_GNSS,PT_key_file=PT_key_file,dist_thresh=dist_thresh,
                time_thresh=time_thresh,PT_data_directory=PT_data_directory,GNSS_drift_data_directory=QA_QC_drift_output_directory,
                QA_QC_PT_output_directory=QA_QC_PT_output_directory,flagged_PT_directory=flagged_PT_directory,
@@ -98,8 +101,8 @@ SWORD_reach= read.csv('Willamette/Willamette nodes.csv')
 this_river_reach_IDs= as.numeric(as.character(unique(SWORD_reach$reach_id)))
 source('R code/calculate_slope_wse_fromPT.R')
 
-dummy=calculate_slope_wse_fromPT(keyfile=keyfile,PT_files=PT_files,SWORD_path=SWORD_path,
-                                 SWORD_reach=SWORD_reach,this_river_reach_IDs=this_river_reach_IDs)
+dummy=calculate_slope_wse_fromPT(keyfile=keyfile,pt_files=PT_files,SWORD_path=SWORD_path,
+                                 SWORD_reach=SWORD_reach,this_river_reach_ids=this_river_reach_IDs)
 #-----------------------------
 
 #define what drift goes with what SWOT overpass--------------------

@@ -1,6 +1,6 @@
-correct_PT_to_GNSS= function(raw_PT_file,PT_key_file,dist_thresh,time_thresh,PT_data_directory,
-                             GNSS_drift_data_directory,QA_QC_PT_output_directory, flagged_PT_directory,
-                             GNSS_sd_thresh,offset_diff_thresh,change_thresh_15_min){
+correct_pt_to_gnss= function(raw_pt_file,pt_key_file,dist_thresh,time_thresh,pt_data_directory,
+                             gnss_drift_data_directory,QA_QC_pt_output_directory, flagged_pt_directory,
+                             gnss_sd_thresh,offset_diff_thresh,change_thresh_15_min){
   
   library(dplyr)
   library(tidyr)
@@ -9,14 +9,14 @@ correct_PT_to_GNSS= function(raw_PT_file,PT_key_file,dist_thresh,time_thresh,PT_
   library(bayesbio)
   library(ncdf4)
   
-  filename=raw_PT_file
+  filename=raw_pt_file
   
-  handle_raw_PT=function(raw_PT_file,PT_key_file,PT_data_directory,GNSS_drift_data_directory){
-    #read in raw PT--------------
+  handle_raw_pt=function(raw_pt_file,pt_key_file,pt_data_directory,gnss_drift_data_directory){
+    #read in raw pt--------------
     #ID could come from the filename, right now it is reading the serial number from the file
     
     #kluge that quickly gets what we want by reading in the csv flat and pulling the first entry
-    PT_serial = strtoi(as.character(read.csv(paste0(PT_data_directory,raw_PT_file,'.csv'))$Serial_number.[1]))
+    pt_serial = strtoi(as.character(read.csv(paste0(pt_data_directory,raw_pt_file,'.csv'))$Serial_number.[1]))
     
     #11 lines of headers to skip to deal with read in function
     
@@ -24,29 +24,29 @@ correct_PT_to_GNSS= function(raw_PT_file,PT_key_file,dist_thresh,time_thresh,PT_
     #The willamette data have a missing header, so we skip the 12th line and assign our own header. Deadly !
     #!!!!!!!!!!!!!
     
-    PT_data= read.csv(paste0(PT_data_directory,raw_PT_file,'.csv'),skip=12,header=TRUE,fill=TRUE,col.names = c('Date','Time','ms','Level','Temperature')) %>%
-      mutate(PT_Serial=PT_serial)
+    pt_data= read.csv(paste0(pt_data_directory,raw_pt_file,'.csv'),skip=12,header=TRUE,fill=TRUE,col.names = c('Date','Time','ms','Level','Temperature')) %>%
+      mutate(pt_Serial=pt_serial)
     #----------------------------
     
     #read in offset--------------
-    keyfile=read.csv(PT_key_file,stringsAsFactors = FALSE)%>%
+    keyfile=read.csv(pt_key_file,stringsAsFactors = FALSE)%>%
       mutate('driftID'= final_log_file)
-    #left joining the key in 'offset' gets us a tidy data frame where the info from the key is promulgated to just that PT. a right join would give
-    #an n fold expansion across n PTs
-    PT_data=PT_data %>%
-      left_join(keyfile,by='PT_Serial')%>%
+    #left joining the key in 'offset' gets us a tidy data frame where the info from the key is promulgated to just that pt. a right join would give
+    #an n fold expansion across n pts
+    pt_data=pt_data %>%
+      left_join(keyfile,by='pt_Serial')%>%
       mutate(datetime= as.POSIXct(paste(Date,Time),format= "%Y/%m/%d %H:%M:%S") )%>%
-      mutate(PT_Lat= Lat_WGS84)%>%
-      mutate(PT_Lon=Long_WGS84)%>%
-      mutate(PT_time_UTC=datetime)
+      mutate(pt_Lat= Lat_WGS84)%>%
+      mutate(pt_Lon=Long_WGS84)%>%
+      mutate(pt_time_UTC=datetime)
     
     
     #----------------------------
-  } # end PT function
-  correct_PT=function(prepped_PT,dist_thresh,time_thresh,GNSS_drift_data_directory){
+  } # end pt function
+  correct_pt=function(prepped_pt,dist_thresh,time_thresh,gnss_drift_data_directory){
     
    
-    log_files= unique(prepped_PT$driftID) #the second from the join.
+    log_files= unique(prepped_pt$driftID) #the second from the join.
     if(length(log_files)==0){
       return(NA)
     }
@@ -55,56 +55,56 @@ correct_PT_to_GNSS= function(raw_PT_file,PT_key_file,dist_thresh,time_thresh,PT_
       return(NA)
     }
     
-    unit_PT_process = function(log_file,prepped_PT,dist_thresh,time_thresh,GNSS_drift_data_directory){
+    unit_pt_process = function(log_file,prepped_pt,dist_thresh,time_thresh,gnss_drift_data_directory){
       
-      GNSS_log=read.csv(paste0(GNSS_drift_data_directory,log_file,'.csv'),header=TRUE,stringsAsFactors = FALSE)%>%
-        mutate(datetime=GNSS_time_UTC)%>%
+      gnss_log=read.csv(paste0(gnss_drift_data_directory,log_file,'.csv'),header=TRUE,stringsAsFactors = FALSE)%>%
+        mutate(datetime=gnss_time_UTC)%>%
         mutate(datetime=as.POSIXct(datetime))#needed as when it gets written to csv it becomes not a posix object
 
       #half a second faster to join first on time and then on space
-      clean_PT_time=difference_inner_join(prepped_PT,GNSS_log,by='datetime',max_dist=time_thresh)
+      clean_pt_time=difference_inner_join(prepped_pt,gnss_log,by='datetime',max_dist=time_thresh)
     
       #need lon then lat
-     distance_m=geodist(cbind(clean_PT_time$PT_lon, clean_PT_time$PT_lat), cbind(clean_PT_time$GNSS_Lon, clean_PT_time$GNSS_Lat), paired=TRUE,measure='haversine')
+     distance_m=geodist(cbind(clean_pt_time$pt_lon, clean_pt_time$pt_lat), cbind(clean_pt_time$gnss_Lon, clean_pt_time$gnss_Lat), paired=TRUE,measure='haversine')
       
 
-     clean_PT=cbind(clean_PT_time,distance_m)%>%
+     clean_pt=cbind(clean_pt_time,distance_m)%>%
         filter(distance_m<dist_thresh)%>%
         #ok, let's select for stuff we want to keep now
-        transmute(PT_level=PT_level, Temperature=Temperature,GNSS_time_UTC=GNSS_time_UTC,GNSS_wse=GNSS_wse,PT_time_UTC=PT_time_UTC,
-                  PT_Serial=PT_serial,
-                  GNSS_lat=GNSS_Lat, GNSS_lon=GNSS_Lon, PT_lat=PT_lat, PT_lon=PT_lon,GNSS_PT_dist_m=distance_m )
+        transmute(pt_level=pt_level, Temperature=Temperature,gnss_time_UTC=gnss_time_UTC,gnss_wse=gnss_wse,pt_time_UTC=pt_time_UTC,
+                  pt_Serial=pt_serial,
+                  gnss_lat=gnss_Lat, gnss_lon=gnss_Lon, pt_lat=pt_lat, pt_lon=pt_lon,gnss_pt_dist_m=distance_m )
 
 
-      #next, ensure there are enough GNSS points to make a valid offset correction
-   if(nrow(clean_PT)==0){
+      #next, ensure there are enough gnss points to make a valid offset correction
+   if(nrow(clean_pt)==0){
      return(NA)
      
    }
       
-      #now, multiple GNSS points go to one PT. Need to group by PT timestwp and apply the correction at that level
+      #now, multiple gnss points go to one pt. Need to group by pt timestwp and apply the correction at that level
       #the differneces in these offsets is the uncertainty of this mapping
  
       
-      offset_PT_mean=clean_PT%>%
-        group_by(PT_time_UTC)%>%
-        mutate( offset=(GNSS_wse-PT_level))%>%
-        summarize(PT_correction= mean(offset))
+      offset_pt_mean=clean_pt%>%
+        group_by(pt_time_UTC)%>%
+        mutate( offset=(gnss_wse-pt_level))%>%
+        summarize(pt_correction= mean(offset))
       
-      offset_PT_sd =clean_PT%>%
-        group_by(PT_time_UTC)%>%
-        mutate( offset=(GNSS_wse-PT_level))%>%
-        summarize(PT_correction_sd=sd(offset))
+      offset_pt_sd =clean_pt%>%
+        group_by(pt_time_UTC)%>%
+        mutate( offset=(gnss_wse-pt_level))%>%
+        summarize(pt_correction_sd=sd(offset))
       
       
-      wse_PT=clean_PT%>%
-        left_join(offset_PT_mean,by='PT_time_UTC')%>%
-        left_join(offset_PT_sd,by='PT_time_UTC')%>%
-        mutate(PT_wse=PT_level+PT_correction)%>%
-        mutate(PT_wse_sd= sqrt(sum(sd(PT_level)^2 + PT_correction_sd^2) ))
+      wse_pt=clean_pt%>%
+        left_join(offset_pt_mean,by='pt_time_UTC')%>%
+        left_join(offset_pt_sd,by='pt_time_UTC')%>%
+        mutate(pt_wse=pt_level+pt_correction)%>%
+        mutate(pt_wse_sd= sqrt(sum(sd(pt_level)^2 + pt_correction_sd^2) ))
       
    
-      return(wse_PT)
+      return(wse_pt)
       
 
  
@@ -112,111 +112,111 @@ correct_PT_to_GNSS= function(raw_PT_file,PT_key_file,dist_thresh,time_thresh,PT_
     
 
     
-    #loop through the log files, find the right GNSS data to associate with the install,
-    # average the GNSS heigh within a distance theshold, and then create a corrected PT df
+    #loop through the log files, find the right gnss data to associate with the install,
+    # average the gnss heigh within a distance theshold, and then create a corrected pt df
     #by binding each log file together. This is uncessary, but will handle that one special case
-    finalPT=do.call(rbind,lapply(log_files,unit_PT_process,prepped_PT=prepped_PT,dist_thresh=dist_thresh,
-                                 time_thresh=time_thresh,GNSS_drift_data_directory=GNSS_drift_data_directory))
+    finalpt=do.call(rbind,lapply(log_files,unit_pt_process,prepped_pt=prepped_pt,dist_thresh=dist_thresh,
+                                 time_thresh=time_thresh,gnss_drift_data_directory=gnss_drift_data_directory))
     
 
     
   }
   
-  #read in PT
-  prepped_PT=handle_raw_PT(raw_PT_file,PT_key_file,PT_data_directory,GNSS_drift_data_directory)%>%
-    transmute(PT_time_UTC=PT_time_UTC,PT_lat=PT_Lat,PT_lon=PT_Lon,
-              PT_install_UTC=as.POSIXct(paste(Date_Install,Time_Install_UTC),format= "%m/%d/%Y %H:%M"),
-              PT_uninstall_UTC=as.POSIXct(paste(Date_Uninstall,Time_Uninstall),format= "%m/%d/%Y %H:%M"),
-              Install_method=Install_method, PT_serial=PT_Serial,PT_level=Level,Temperature=Temperature,driftID=driftID,datetime=PT_time_UTC)
+  #read in pt
+  prepped_pt=handle_raw_pt(raw_pt_file,pt_key_file,pt_data_directory,gnss_drift_data_directory)%>%
+    transmute(pt_time_UTC=pt_time_UTC,pt_lat=pt_Lat,pt_lon=pt_Lon,
+              pt_install_UTC=as.POSIXct(paste(Date_Install,Time_Install_UTC),format= "%m/%d/%Y %H:%M"),
+              pt_uninstall_UTC=as.POSIXct(paste(Date_Uninstall,Time_Uninstall),format= "%m/%d/%Y %H:%M"),
+              install_method=Install_method, pt_serial=pt_Serial,pt_level=Level,temperature=Temperature,driftID=driftID,datetime=pt_time_UTC)
   
-  if(sum(is.na(prepped_PT$PT_lat))==nrow(prepped_PT)){
-    print('this PT isnt in the key')
-    saveRDS(prepped_PT,file=paste0(flagged_PT_output_directory,filename,'_',prepped_PT$PT_Serial[1],'.rds'))
+  if(sum(is.na(prepped_pt$pt_lat))==nrow(prepped_pt)){
+    print('this pt isnt in the key')
+    saveRDS(prepped_pt,file=paste0(flagged_pt_output_directory,filename,'_',prepped_pt$pt_Serial[1],'.rds'))
     return(NA)
   }
   
   
               
-  #make GNSS offset
-  offset_PT=correct_PT(prepped_PT,dist_thresh,time_thresh,GNSS_drift_data_directory)
+  #make gnss offset
+  offset_pt=correct_pt(prepped_pt,dist_thresh,time_thresh,gnss_drift_data_directory)
 
 
-if (all(is.na(offset_PT))){
+if (all(is.na(offset_pt))){
   print(filename)
-  print('There are no GNSS data within the space-time thresholds')
-  output='There are no GNSS data within the space-time thresholds'
-  saveRDS(output,file=paste0(flagged_PT_output_directory,filename,'_',prepped_PT$PT_Serial[1],'.rds'))
+  print('There are no gnss data within the space-time thresholds')
+  output='There are no gnss data within the space-time thresholds'
+  saveRDS(output,file=paste0(flagged_pt_output_directory,filename,'_',prepped_pt$pt_Serial[1],'.rds'))
   return(NA)}
 # 
 
 
-  if (nrow(offset_PT)<5 ){
+  if (nrow(offset_pt)<5 ){
     print(filename)
     print('not enough data to create offset, change your thresholds or double check the data')
     output='not enough data to create offset, change your thresholds or double check the data'
-    offset_PT=mutate(offset_PT,error=output)
-    saveRDS(offset_PT,file=paste0(flagged_PT_output_directory,filename,'_',offset_PT$PT_Serial[1],'.rds'))
+    offset_pt=mutate(offset_pt,error=output)
+    saveRDS(offset_pt,file=paste0(flagged_pt_output_directory,filename,'_',offset_pt$pt_Serial[1],'.rds'))
     return(NA)
   }
 
   
-  #now check the offset for a few things that we care about. We're checking only the PT corrections we've made
+  #now check the offset for a few things that we care about. We're checking only the pt corrections we've made
   
-  #1- are the GNSS data too noisy?
-  if(sd(offset_PT$GNSS_wse)>GNSS_sd_thresh  ){
+  #1- are the gnss data too noisy?
+  if(sd(offset_pt$gnss_wse)>gnss_sd_thresh  ){
     print(filename)
-    print('GNSS range too large, check thresholds or data')
-    output='GNSS range too large, check thresholds or data'
-    offset_PT=mutate(offset_PT,error=output)
-    saveRDS(offset_PT,file=paste0(flagged_PT_output_directory,filename,'_',offset_PT$PT_Serial[1],'.rds'))
+    print('gnss range too large, check thresholds or data')
+    output='gnss range too large, check thresholds or data'
+    offset_pt=mutate(offset_pt,error=output)
+    saveRDS(offset_pt,file=paste0(flagged_pt_output_directory,filename,'_',offset_pt$pt_Serial[1],'.rds'))
     return(NA)
   }
   
-  #2- are the PT data too noisy?
-  if(sd(offset_PT$PT_correction_sd) >offset_sd_thresh  ){
+  #2- are the pt data too noisy?
+  if(sd(offset_pt$pt_correction_sd) >offset_sd_thresh  ){
     print(filename)
     print('correction too noisy, check thresholds or data')
     output='correction too noisy, check thresholds or data'
-    offset_PT=mutate(offset_PT,error=output)
-    saveRDS(offset_PT,file=paste0(flagged_PT_output_directory,filename,'_',offset_PT$PT_Serial[1],'.rds'))
+    offset_pt=mutate(offset_pt,error=output)
+    saveRDS(offset_pt,file=paste0(flagged_pt_output_directory,filename,'_',offset_pt$pt_Serial[1],'.rds'))
     return(NA)
   }
   
   #3 -are the offsets changing too much in time?
-  if(sd(offset_PT$PT_correction) >offset_sd_thresh  ){
+  if(sd(offset_pt$pt_correction) >offset_sd_thresh  ){
     print(filename)
     print('offsets are too different over time, check thresholds or data')
     output='offsets are too different over time, check thresholds or data'
-    offset_PT=mutate(offset_PT,error=output)
-    saveRDS(offset_PT,file=paste0(flagged_PT_output_directory,filename,'_',offset_PT$PT_Serial[1],'.rds'))
+    offset_pt=mutate(offset_pt,error=output)
+    saveRDS(offset_pt,file=paste0(flagged_pt_output_directory,filename,'_',offset_pt$pt_Serial[1],'.rds'))
     return(NA)
   }
   
   
-  #if those pass, we're good! now, we need to apply the offsets to the rest of the PT data
-  #apply the offset to the original (unjoined) PT data
+  #if those pass, we're good! now, we need to apply the offsets to the rest of the pt data
+  #apply the offset to the original (unjoined) pt data
   #use the closest offset in time
   #bayesbio has a nice nearest time join!
   
-  #first strip the offest df into just the GNSS time and the PT correction and SD
-   svelte_offset_PT=select(offset_PT,PT_correction,PT_wse_sd,GNSS_time_UTC)
+  #first strip the offest df into just the gnss time and the pt correction and SD
+   svelte_offset_pt=select(offset_pt,pt_correction,pt_wse_sd,gnss_time_UTC)
    timenow=Sys.time()
 
-   final_PT =  nearestTime(prepped_PT,svelte_offset_PT,'PT_time_UTC','GNSS_time_UTC')%>%
-     #drop PT data before instal' time
-     mutate(timediff_install=PT_install_UTC-PT_time_UTC)%>%
+   final_pt =  nearestTime(prepped_pt,svelte_offset_pt,'pt_time_UTC','gnss_time_UTC')%>%
+     #drop pt data before instal' time
+     mutate(timediff_install=pt_install_UTC-pt_time_UTC)%>%
      filter(timediff_install<0)%>%
-     #drop PT data after uninstall time
-     mutate(timediff_uninstall=PT_uninstall_UTC-PT_time_UTC)%>%
+     #drop pt data after uninstall time
+     mutate(timediff_uninstall=pt_uninstall_UTC-pt_time_UTC)%>%
      filter(timediff_uninstall>0)%>%
      select(-timediff_install,-timediff_uninstall)%>%
-     mutate(PT_wse=PT_level+PT_correction)
+     mutate(pt_wse=pt_level+pt_correction)
   
 
     print(Sys.time()-timenow)
     print(filename)
     print('this file passed all checks')
-    write.csv(final_PT,file=paste0(QA_QC_PT_output_directory,filename,'.csv'))
+    write.csv(final_pt,file=paste0(QA_QC_pt_output_directory,filename,'.csv'))
 
 
   
