@@ -1,9 +1,9 @@
 library(dplyr)
 library(parallel)
 
-#setwd('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/')
+setwd('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/')
 #setwd('C:/Users/confluence/Desktop/calval_toolbox/')
-setwd('C:/Users/colin/Desktop/calval_toolbox/')
+#setwd('C:/Users/colin/Desktop/calval_toolbox/')
 
 #PT paths
 PT_data_directory='Willamette/Willamette raw PTs/'
@@ -19,7 +19,7 @@ flagged_drift_output_directory='Willamette/Willamette flagged drifts/'
 #--------------------------------------------------
 
 #sword paths----------------------------------------
-SWORD_path='na_sword_v14.nc'
+SWORD_path='na_sword_v11.nc'
 munged_drift_directory='Willamette/Willamette munged drifts/'
 PT_directory='Willamette/Willamette munged PTs/'
 output_directory='Willamette/SWORD products/'
@@ -49,7 +49,6 @@ if(!identical(unmunged_drifts,character(0))){
 #-------------------------------------------------
 
 # munge PTs if needed------
-
 dist_thresh=150 # 150m
 time_thresh= 15*60 #minutes as seconds, centered, so 15 =30 mins total time
 GNSS_sd_thresh=0.15 # 15cm how much variance do you want in the GNSS data when it is within the distance threshold?
@@ -90,12 +89,11 @@ if(!identical(unmunged_PTs,character(0))){
 #-----------------------------
 
 #calculate slopes and heights from drifts within nodes and reaches------
-
 SWORD_reach= read.csv('Willamette/Willamette nodes.csv')
 this_river_reach_IDs= as.numeric(as.character(unique(SWORD_reach$reach_id)))
 this_river_node_IDs= as.numeric(as.character(unique(SWORD_reach$node_id)))
 utm_zone=10
-buffer=30 #m, 'extends' the reach
+buffer=50 #m, 'extends' the reach
 rivername='Willamette'
 
 source('R code/calculate_slope_wse_fromdrift.R')
@@ -114,7 +112,6 @@ dummy=calculate_sope_wse_fromdrift(SWORD_path=SWORD_path,
 #calculate slopes and heights from PTs within nodes and reaches----
 keyfile='Willamette/WM_Key.csv'
 PT_files=paste0('Willamette/Willamette munged PTs/',list.files('Willamette/Willamette munged PTs/'))
-SWORD_path='na_sword_v11.nc'
 SWORD_reach= read.csv('Willamette/Willamette nodes.csv')
 this_river_reach_IDs= as.numeric(as.character(unique(SWORD_reach$reach_id)))
 source('R code/calculate_slope_wse_fromPT.R')

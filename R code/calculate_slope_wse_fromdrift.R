@@ -256,7 +256,7 @@ calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river
   slope_end_elevations= drift_in[slope_end_index,]$gnss_wse
   
   slope= (mean(slope_start_elevations)- mean(slope_end_elevations)) / cl_distance
-  slope_sd= sqrt(sd(slope_start_elevations)^2+sd(slope_end_elevations)^2)
+  slope_sd= (sqrt(sd(slope_start_elevations)^2+sd(slope_end_elevations)^2)) / cl_distance
 
   if (is.na(slope_sd)){wse_bar=NA}#kluge that tells us the whole reach wasn't floated
     

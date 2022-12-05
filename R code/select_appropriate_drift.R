@@ -84,6 +84,7 @@ mutate(wse_difference= gnss_wse - pt_wse)%>%
             wse_difference_m_sd=sd(wse_difference_m),
             swot_passid=first(swot_passid),
             swot_time_UTC=first(swot_time_UTC))%>%
+  ungroup()%>%
   mutate(node_id=as.character(node_id))
 
 

@@ -186,7 +186,7 @@ correct_pt_to_gnss= function(raw_pt_file,pt_key_file,dist_thresh,time_thresh,pt_
   }
   
   #3 -are the offsets changing too much in time?
-  if(sd(offset_pt$pt_correction) >offset_sd_thresh  ){
+  if(sd(offset_pt$pt_correction) >change_thresh_15_min  ){
     print(filename)
     print('offsets are too different over time, check thresholds or data')
     output='offsets are too different over time, check thresholds or data'
