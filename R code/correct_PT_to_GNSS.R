@@ -83,8 +83,8 @@ correct_pt_to_gnss= function(raw_pt_file,pt_key_file,dist_thresh,time_thresh,pt_
         
       }
       
-      #now, multiple gnss points go to one pt. Need to group by pt timestwp and apply the correction at that level
-      #the differneces in these offsets is the uncertainty of this mapping
+      #now, multiple gnss points go to one pt. Need to group by pt timestep and apply the correction at that level
+      #the differences in these offsets is the uncertainty of this mapping
       
       
       offset_pt_mean=clean_pt%>%
@@ -115,8 +115,8 @@ correct_pt_to_gnss= function(raw_pt_file,pt_key_file,dist_thresh,time_thresh,pt_
     
     
     #loop through the log files, find the right gnss data to associate with the install,
-    # average the gnss heigh within a distance theshold, and then create a corrected pt df
-    #by binding each log file together. This is uncessary, but will handle that one special case
+    # average the gnss height within a distance threshold, and then create a corrected pt df
+    #by binding each log file together. This is unnecessary, but will handle that one special case
     finalpt=do.call(rbind,lapply(log_files,unit_pt_process,prepped_pt=prepped_pt,dist_thresh=dist_thresh,
                                  time_thresh=time_thresh,gnss_drift_data_directory=gnss_drift_data_directory))
     
@@ -201,12 +201,12 @@ correct_pt_to_gnss= function(raw_pt_file,pt_key_file,dist_thresh,time_thresh,pt_
   #use the closest offset in time
   #bayesbio has a nice nearest time join!
   
-  #first strip the offest df into just the gnss time and the pt correction and SD
+  #first strip the offset df into just the gnss time and the pt correction and SD
   svelte_offset_pt=select(offset_pt,pt_correction,pt_wse_sd,gnss_time_UTC)
   timenow=Sys.time()
   
   final_pt =  nearestTime(prepped_pt,svelte_offset_pt,'pt_time_UTC','gnss_time_UTC')%>%
-    #drop pt data before instal' time
+    #drop pt data before install' time
     mutate(timediff_install=pt_install_UTC-pt_time_UTC)%>%
     filter(timediff_install<0)%>%
     #drop pt data after uninstall time
