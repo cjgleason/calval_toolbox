@@ -307,8 +307,8 @@ reach_stats=do.call(rbind,lapply(drifts,calc_reach_stats,spatial_reach=spatial_r
 
 
 
-write.csv(node_wses,paste0(output_directory,'node/',rivername,'_node_wses.csv'))
-write.csv(node_geom,paste0(output_directory,'node/',rivername,'_node_geom.csv'))
-write.csv(reach_stats,paste0(output_directory,'reach/',rivername,'_drift_wse_slope.csv'))
+write.csv(node_wses,paste0(output_directory,'node/',rivername,'_drift_node_wses.csv'))
+write.csv(node_geom,paste0(output_directory,'node/',rivername,'_drift_node_geom.csv'))
+write.csv(reach_stats,paste0(output_directory,'reach/',rivername,'_drift_reach_wse_slope.csv'))
 
  }

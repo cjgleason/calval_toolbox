@@ -29,7 +29,7 @@ calculate_slope_wse_fromPT=function(keyfile,pt_files,SWORD_path,SWORD_reach,this
   #calculate node wse
   node_df=pt_df%>%
     group_by(node_id,pt_time_UTC)%>%
-    summarise(mean_pt_wse_m=mean(pt_wse),mean_pt_wse_precision_m=0.001)%>% #JPL wants precision, not variance mean(pt_wse_sd)
+    summarise(mean_reach_pt_wse_m=mean(pt_wse),mean_pt_wse_precision_m=0.001)%>% #JPL wants precision, not variance mean(pt_wse_sd)
     ungroup()%>%#based on grouping, it will repeat
     mutate(node_id=as.character(node_id))%>%
     distinct()#based on grouping, it will repeat
@@ -37,7 +37,7 @@ calculate_slope_wse_fromPT=function(keyfile,pt_files,SWORD_path,SWORD_reach,this
   #calculate reach wse
   reach_df=pt_df%>%
     group_by(reach_id,pt_time_UTC)%>%
-    summarise(mean_pt_wse_m=mean(pt_wse),mean_pt_wse_precision_m=0.001)%>%# JPL wants precision, not variance mean(pt_wse_sd),
+    summarise(mean_reach_pt_wse_m=mean(pt_wse),mean_pt_wse_precision_m=0.001)%>%# JPL wants precision, not variance mean(pt_wse_sd),
     ungroup()%>%#based on grouping, it will repeat
     mutate(reach_id=as.character(reach_id))%>%
     distinct()#based on grouping, it will repeat
@@ -82,7 +82,7 @@ calculate_slope_wse_fromPT=function(keyfile,pt_files,SWORD_path,SWORD_reach,this
     filter(!is.na(slope))
   
   
-  write.csv(final_slope,'Willamette/SWORD products/reach/Willamette_reach_pt_slope.csv')
-  write.csv(reach_df,'Willamette/SWORD products/reach/Willamette_reach_pt_wse.csv')
-  write.csv(node_df,'Willamette/SWORD products/node/Willamette_node_pt_wse.csv')
+  write.csv(final_slope,'Willamette/SWORD products/reach/Willamette_PT_reach_slope.csv')
+  write.csv(reach_df,'Willamette/SWORD products/reach/Willamette_PT_reach_wse.csv')
+  write.csv(node_df,'Willamette/SWORD products/node/Willamette_PT_node_wse.csv')
 }
