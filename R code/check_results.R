@@ -2,7 +2,7 @@ library(dplyr)
 library(ggplot2)
 library(fuzzyjoin)
 
-#compare reach WSE pt vs drift
+#compare reach WSE pt vs drift-------------
 reach_pt_wse=read.csv('Willamette/SWORD products/reach/Willamette_PT_reach_wse.csv')%>%
   select(-X)
 
@@ -19,12 +19,10 @@ plot_wse=ggplot(reach_pt_drift_df) +
   geom_line(aes(x=mean_reach_pt_wse_m,y=mean_reach_pt_wse_m),col='black')+
   labs(x='PT reach wse',y='drift reach wse', title= 'pts within duration of drift through reach')
 
-
 plot(plot_wse)
+#--------------------------------
 
-
-
-#compare node WSE pt vs drift
+#compare node WSE pt vs drift----------
 node_pt_wse=read.csv('Willamette/SWORD products/node/Willamette_PT_node_wse.csv')%>%
   select(-X)%>%
   mutate(datetime=as.POSIXct(pt_time_UTC))
@@ -48,8 +46,9 @@ plot_wse2=ggplot(node_pt_drift_df) +
 
 
 plot(plot_wse2)
+#-------------------------------------
 
-#does averaging node PTs look like a reach averaged PTs?
+#does averaging node PTs look like a reach averaged PTs?---------
 node_joiner=node_drift_wse%>%
   select(node_id,reach_id)
 
@@ -78,4 +77,5 @@ plot3=ggplot(joined_reach_pt_df)+
 
 
 plot(plot3)
+#-------------------
 
