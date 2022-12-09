@@ -29,7 +29,7 @@ calculate_slope_wse_fromPT=function(keyfile,pt_files,SWORD_path,SWORD_reach,this
   #calculate node wse
   node_df=pt_df%>%
     group_by(node_id,pt_time_UTC)%>%
-    summarise(mean_reach_pt_wse_m=mean(pt_wse),mean_pt_wse_precision_m=0.001)%>% #JPL wants precision, not variance mean(pt_wse_sd)
+    summarise(mean_node_pt_wse_m=mean(pt_wse),mean_pt_wse_precision_m=0.001)%>% #JPL wants precision, not variance mean(pt_wse_sd)
     ungroup()%>%#based on grouping, it will repeat
     mutate(node_id=as.character(node_id))%>%
     distinct()#based on grouping, it will repeat
