@@ -51,7 +51,7 @@ pt_at_swot_time= do.call(rbind,lapply(paste0('Willamette/Willamette munged pts/'
   mutate(time_diff_to_swot_pt_sec=abs(pt_time_UTC-swot_time_UTC))%>%
   filter(time_diff_to_swot_pt_sec==min(time_diff_to_swot_pt_sec))%>%
   ungroup()%>%
-  select(-driftID,-X)%>%#this was the drift used to correct it, but taht is ocnfusing here
+  select(-driftID,-X)%>%#this was the drift used to correct it, but that is confusing here
  mutate(Lat=pt_lat,Lon=pt_lon) #for joining
 
 #compare drift node levels with pt levels
