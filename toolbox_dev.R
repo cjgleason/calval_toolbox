@@ -1,8 +1,8 @@
 library(dplyr)
 library(parallel)
 
-setwd('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/')
-#setwd('C:/Users/confluence/Desktop/calval_toolbox/')
+#setwd('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/')
+setwd('C:/Users/confluence/Desktop/calval_toolbox/')
 #setwd('C:/Users/colin/Desktop/calval_toolbox/')
 
 #PT paths

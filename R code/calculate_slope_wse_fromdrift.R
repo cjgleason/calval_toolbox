@@ -4,6 +4,7 @@ calculate_sope_wse_fromdrift=function(SWORD_path,drift_directory,PT_directory,ou
   library(sf)
   library(dplyr)
   library(rgdal)
+  library(ncdf4)
 
 LongLatToUTM<-function(x,y,zone){
   xy <- data.frame(id = 1:length(x), X = x, Y = y)
@@ -127,10 +128,10 @@ calc_node_wse=function(drift_file,node_df,cl_df,zone){
            point1_y= node_UTM_y+sin(node_angle)*node_length/2,
            point2_x=node_UTM_x -cos(node_angle)*node_length/2,
            point2_y=node_UTM_y- sin(node_angle)*node_length/2,
-           point3_x=node_UTM_x +cos(node_angle-(90*pi/180))*node_wmax/2,
-           point3_y=node_UTM_y+ sin(node_angle-(90*pi/180))*node_wmax/2,
-           point4_x=node_UTM_x -cos(node_angle-(90*pi/180))*node_wmax/2,
-           point4_y= node_UTM_y-sin(node_angle-(90*pi/180))*node_wmax/2) %>%
+           point3_x=node_UTM_x +cos(node_angle-(90*pi/180))*node_wmax*2,
+           point3_y=node_UTM_y+ sin(node_angle-(90*pi/180))*node_wmax*2,
+           point4_x=node_UTM_x -cos(node_angle-(90*pi/180))*node_wmax*2,
+           point4_y= node_UTM_y-sin(node_angle-(90*pi/180))*node_wmax*2) %>%
    mutate(node_box_x_max=max(c(point1_x,point2_x,point3_x,point4_x)),
           node_box_x_min=min(c(point1_x,point2_x,point3_x,point4_x)),
           node_box_y_max=max(c(point1_y,point2_y,point3_y,point4_y)),
@@ -155,6 +156,9 @@ calc_node_wse=function(drift_file,node_df,cl_df,zone){
 
   spatial_node_cls=st_as_sf(spatial_node_cls,sf_column_name='poly_list')
   st_crs(spatial_node_cls)= paste0('+proj=utm +zone=',zone,' +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs')
+  
+
+  write.csv(spatial_node_cls,paste0(output_directory,'node/',rivername,'_drift_node_geom.csv'))
   
   plot(spatial_node_cls$poly_list[1:50],col='red')
   
@@ -308,7 +312,7 @@ reach_stats=do.call(rbind,lapply(drifts,calc_reach_stats,spatial_reach=spatial_r
 
 
 write.csv(node_wses,paste0(output_directory,'node/',rivername,'_drift_node_wses.csv'))
-write.csv(node_geom,paste0(output_directory,'node/',rivername,'_drift_node_geom.csv'))
+
 write.csv(reach_stats,paste0(output_directory,'reach/',rivername,'_drift_reach_wse_slope.csv'))
 
  }
