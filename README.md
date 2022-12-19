@@ -6,6 +6,7 @@ To run the toolboxes, the following inputs from the PO.DAAC repository are requi
 
 **PT inputs:**
 - PT data directory containing all raw PT csv files. First 11 rows of the csv are metadata, header on line 12 contains the following data:
+
 | Variable	| Description |
 |----------|--------------|
 |Date	| yyyy/mm/dd format |
@@ -15,6 +16,7 @@ To run the toolboxes, the following inputs from the PO.DAAC repository are requi
 |Offset	 | meters |
 
 - PT key csv file that links PTs to SWORD reaches/nodes, install/uninstall GNSS drifts, and contains spatial information about the PT
+
 | Variable	| Description |
 |----------|--------------|
 | PT_Serial	| 7-digit PT serial number |
@@ -47,6 +49,7 @@ To run the toolboxes, the following inputs from the PO.DAAC repository are requi
 
 **GNSS inputs:**
 -	GNSS drift data directory with all raw GNSS netCDF files containing:
+
 | Variable	| Description |
 |----------|--------------|
 | Latitude |
@@ -260,6 +263,7 @@ Reach water surface elevation and slope as ‘rivername’ _drift_reach_wse_slop
 - From these calculations, there are three csv files saved into the node and reach output directories, respectively:
 
 PT node water surface elevation:
+
 | Variable	| Description |
 |----------|--------------|
 | node_id	 | SWORD node ID |
@@ -268,6 +272,7 @@ PT node water surface elevation:
 | mean_pt_wse_precision_m	| In meters, instrument error, 0.001 m |
 
 PT reach water surface elevation:
+
 | Variable	| Description |
 |----------|--------------|
 | reach_id	| SWORD reach ID |
@@ -276,6 +281,7 @@ PT reach water surface elevation:
 | mean_pt_wse_precision_m	| In meters, instrument error, 0.001 m |
 
 PT reach slope:
+
 | Variable	| Description |
 |----------|--------------|
 | reach_id	| SWORD reach ID |
