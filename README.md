@@ -15,7 +15,7 @@ To run the toolboxes, the following inputs from the PO.DAAC repository are requi
 | Temperature	| °C |
 |Offset	 | meters |
 
-- PT key csv file that links PTs to SWORD reaches/nodes, install/uninstall GNSS drifts, and contains spatial information about the PT
+- PT key csv file that links PTs to SWORD reaches/nodes, install/uninstall GNSS drifts, and contains spatial information about the PT:
 
 | Variable	| Description |
 |----------|--------------|
@@ -37,7 +37,7 @@ To run the toolboxes, the following inputs from the PO.DAAC repository are requi
 | GNSS_install_date | |
 | GNSS_install_start | |
 | GNSS_install_end | |
-| GNSS_offset_m	meters | |
+| GNSS_offset_m	| meters |
 | Receiver | GNSS receiver used (e.g. Rec3) |
 | Original_log_file |
 | Final_log_file |
@@ -68,7 +68,7 @@ To run the toolboxes, the following inputs from the PO.DAAC repository are requi
 **SWORD inputs:**
 - SWORD data in the netCDF format brought in at the continental scale with centerline, node, and reach data. See [SWORD Production Description PDF](http://gaia.geosci.unc.edu/SWORD/SWORD_ProductDescription_v14.pdf) for detailed dataset documentation.
 
-- Empty directories are created to store munged data outputs for PTs, GNSS drifts, and integrated SWORD products in addition to directories created for quality control flagged PT and GNSS drift output data.
+Empty directories are created to store munged data outputs for PTs, GNSS drifts, and integrated SWORD products in addition to directories created for quality control flagged PT and GNSS drift output data.
 
 ## Creating data frames from GNSS drifts
 
@@ -102,9 +102,13 @@ To run the toolboxes, the following inputs from the PO.DAAC repository are requi
 Error thresholds for data:
 
 **Distance threshold:** 150 meters, PT must be within a 150 m radius of a GNSS drift
+
 **Time threshold:** 900 seconds (15 minutes), centered around PT collect, so 15 minutes before and after
+
 **GNSS standard deviation:** 0.15 meters, how much variance is allowed in GNSS data when it is within the distance threshold
+
 **Offset standard deviation:** 0.10 meters, how much variance is allowed in PT data from put in to take out
+
 **Change threshold over 15 minutes:** 0.05 meters, does it change more than 5cm in 15 minutes? If so, that is a discontinuity in offset
 
 ***These will be specific to each river and are subject to change/should be up for debate!***
@@ -296,7 +300,9 @@ PT reach slope:
 Define thresholds for linking GNSS drifts to SWOT overpasses:
 
 **Time threshold:** Two hours
+
 **Water surface elevation threshold:** Within 5cm
+
 **Distance threshold:** Within 200m
 
 ***These will be specific to each river and are subject to change/should be up for debate!***
