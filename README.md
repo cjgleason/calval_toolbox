@@ -1,6 +1,6 @@
-#SWOT Calibration and Validation Hydrology Toolboxes
+# SWOT Calibration and Validation Hydrology Toolboxes
 
-##Toolboxes for the hydrology corrections of cal/val field data for comparison with SWOT satellite data.
+## Toolboxes for the hydrology corrections of cal/val field data for comparison with SWOT satellite data.
 
 To run the toolboxes, the following inputs from the PO.DAAC repository are required:
 
@@ -67,7 +67,7 @@ To run the toolboxes, the following inputs from the PO.DAAC repository are requi
 
 - Empty directories are created to store munged data outputs for PTs, GNSS drifts, and integrated SWORD products in addition to directories created for quality control flagged PT and GNSS drift output data.
 
-##Creating data frames from GNSS drifts
+## Creating data frames from GNSS drifts
 
 - First, check for un-munged GNSS files in the GNSS drift data directory that have not already been processed. If there are, then run the create_GNSS_dataframe function.
 
@@ -94,7 +94,7 @@ To run the toolboxes, the following inputs from the PO.DAAC repository are requi
 | GNSS_ellipsoid	| Corrected by JPL |
 | Drift_ID	| Following calval naming conventions |
 
-##Correct PTs to GNSS
+## Correct PTs to GNSS
 
 Error thresholds for data:
 
@@ -155,7 +155,7 @@ Error thresholds for data:
 | pt_wse_sd	| Uncertainty in meters, equal to all variance in all offsets used to create PT water surface elevation plus PT measurement error |
 | pt_wse | PT correction plus PT level, in meters |
 
-##Calculate slopes and heights from drifts within nodes and reaches
+## Calculate slopes and heights from drifts within nodes and reaches
 
 - Read in the river-specific SWORD reach data and pull all river reach and node IDs. Set the UTM zone and define a buffer of 50 m to extend the reach.
 
@@ -196,7 +196,7 @@ Bring in the SWORD centerlines in netCDF format for the specific river and creat
 | cl_id	| Centerline ID |
 | cl_node_id	| Centerline node ID |
 
-###Calculate node water surface elevation
+### Calculate node water surface elevation
 
 - Read in the GNSS drift csv file and convert the latitude and longitude to UTMs and the time to POSIXct UTC.
 
@@ -204,7 +204,7 @@ Bring in the SWORD centerlines in netCDF format for the specific river and creat
 
 - Make the GNSS drift data a spatial object and find the intersection between the node boxes and drift points. Group these points by node ID and then take the mean of all GNSS water surface elevation points within the boxes as the mean node water surface elevation (in meters). Compute the mean GNSS time for all drift data within the box and save the reach ID, drift ID, and node water surface elevation precision as 0.05 m.
 
-###Calculate reach water surface elevation and slope from drifts
+### Calculate reach water surface elevation and slope from drifts
 
 - Read in the GNSS drift csv file and convert the latitude and longitude to UTMs and the time to POSIXct UTC.
 
@@ -245,7 +245,7 @@ Reach water surface elevation and slope as ‘rivername’ _drift_reach_wse_slop
 | slope_precision	| Standard deviation |
 | drift¬_id	| Following calval naming conventions |
 
-###Calculate slopes and heights from PTs within nodes and reaches
+### Calculate slopes and heights from PTs within nodes and reaches
 
 - Bring in the munged PTs, the key file, and SWORD reaches and nodes for the river of interest. Next, run the calculate_slope_wse_fromPT function.
 
@@ -283,7 +283,7 @@ PT reach slope:
 | slope	| Slope |
 | slope_precision	| Standard deviation of PT measurements |
 
-##Define what drift goes with what SWOT overpass
+## Define what drift goes with what SWOT overpass
 
 *Right now, this is set up with a fake SWOT pass ID and time.*
 
