@@ -31,7 +31,7 @@ utm_zone = 10
 image_time = '11:00'
 
 #scale max width (in cases of under/overestimated or centerline offset)
-scale_maxwidth = 2
+scale_maxwidth = 3
 
 ##other parameter setting
 #Threshold for water mapping
@@ -76,13 +76,20 @@ DegreetoRadian<-function(degree){
 #get the largest component of a binary image
 GetTolpix_fromlargest_binaryimage<-function(rastertemp){
   tolpix = 0
+  labelpix=0
   for(labeli in min(rastertemp[!is.na(rastertemp)]):max(rastertemp[!is.na(rastertemp)])){
-    if(tolpix<sum(rastertemp[rastertemp==labeli])){
+    if(tolpix<(sum(rastertemp[rastertemp==labeli])/labeli)){
       tolpix = sum(rastertemp[rastertemp==labeli])/labeli
+      labelpix = labeli
     }
   }
-  return(tolpix)
+  return(c(tolpix,labelpix))
 }
+#sum(labelregions[labelregions==1])/1
+#sum(labelregions[labelregions==2])/2
+#sum(labelregions[labelregions==3])/3
+
+
 ##############################functions end########################
 
 #create sub-folders for different outputs
@@ -169,10 +176,10 @@ for (eachnode in this_river_node_IDs) {
   tempdata = data.frame(f=99.9)
   NodeROI_polys_spatialwref = SpatialPolygonsDataFrame(NodeROI_polys_spatial,tempdata)
   
-  shapefile(x = NodeROI_polys_spatialwref, file = paste0(dir_output_ROI,'/','NodeID',eachnode,'2scale_',scale_maxwidth,'_ROI.shp'),overwrite=TRUE)
+  shapefile(x = NodeROI_polys_spatialwref, file = paste0(dir_output_ROI,'/','NodeID_',eachnode,'_ROI.shp'),overwrite=TRUE)
   
   # read ROI shapefile
-  Node_ROI = readOGR(paste0(dir_output_ROI,'/','NodeID',eachnode,'_scale_',scale_maxwidth,'_ROI.shp'), layer = paste0('NodeID',eachnode,'2scale_',scale_maxwidth,'_ROI'))
+  Node_ROI = readOGR(paste0(dir_output_ROI,'/','NodeID_',eachnode,'_ROI.shp'), layer = paste0('NodeID_',eachnode,'_ROI'))
   # reproject ROI to image projection (not necessary if the projections are the same)
   Node_ROI = spTransform(Node_ROI, crs(Pleiades_image))
   
@@ -184,6 +191,8 @@ for (eachnode in this_river_node_IDs) {
   # clip Pleiades image by each reach ROI
   masked_Pleiades_image <- mask(x = Pleiades_image, mask = Node_ROI)
   r_node = crop(masked_Pleiades_image, Node_ROI)
+  # testing only (for normal running comment below and uncomment above)
+  #r_node = crop(Pleiades_image, Node_ROI)
   
   # read the id of each read (to be changed to "SWORD_id")
   node_id_str = as.character(eachnode)
@@ -209,31 +218,34 @@ for (eachnode in this_river_node_IDs) {
   #refer to https://gis.stackexchange.com/questions/348693/finding-regions-in-raster-with-rastertopolygons-r
   labelregions = clump(r_binary_water)
   #calculate water area; unit: m2
-  waterarea = GetTolpix_fromlargest_binaryimage(labelregions) * res(r_binary_water)[1] * res(r_binary_water)[2]
+  waterarea = GetTolpix_fromlargest_binaryimage(labelregions)[1] * res(r_binary_water)[1] * res(r_binary_water)[2]
   
   ##Water area uncertainty
   r_binary_water_lower = ndwi
   r_binary_water_lower[r_binary_water_lower >= (water_index_threshold+ThresholdOffset_4_uncertainty)] = 1 # water pixel
   r_binary_water_lower[r_binary_water_lower < (water_index_threshold+ThresholdOffset_4_uncertainty)] = 0 # non-water pixel
   labelregions_lower = clump(r_binary_water_lower)
-  waterarea_lower = GetTolpix_fromlargest_binaryimage(labelregions_lower) * res(r_binary_water_lower)[1] * res(r_binary_water_lower)[2]
+  waterarea_lower = GetTolpix_fromlargest_binaryimage(labelregions_lower)[1] * res(r_binary_water_lower)[1] * res(r_binary_water_lower)[2]
   r_binary_water_upper = ndwi
   r_binary_water_upper[r_binary_water_upper >= (water_index_threshold-ThresholdOffset_4_uncertainty)] = 1 # water pixel
   r_binary_water_upper[r_binary_water_upper < (water_index_threshold-ThresholdOffset_4_uncertainty)] = 0 # non-water pixel
   labelregions_upper = clump(r_binary_water_upper)
-  waterarea_upper = GetTolpix_fromlargest_binaryimage(labelregions_upper) * res(r_binary_water_upper)[1] * res(r_binary_water_upper)[2]
+  waterarea_upper = GetTolpix_fromlargest_binaryimage(labelregions_upper)[1] * res(r_binary_water_upper)[1] * res(r_binary_water_upper)[2]
   # using std of water areas at various thresholds as the uncertainty
   waterarea_uncertainty = sd(c(waterarea,waterarea_lower,waterarea_upper))
   
+  labelnode = GetTolpix_fromlargest_binaryimage(labelregions)[2]
+  labelregions[labelregions[]!=labelnode]=0
+  labelregions[labelregions[]!=0]=1
   #testing: to be commented
-  plot(r_binary_water)
+  #plot(labelregions)
   
   #sample to 10-m: 0.5m -> 10m with a factor of 20
-  r_binary_water_10m = aggregate(r_binary_water, fact=20)
+  r_binary_water_10m = aggregate(labelregions, fact=20)
   r_binary_water_10m[r_binary_water_10m >= 0.5] = 1 # water pixel
   r_binary_water_10m[r_binary_water_10m < 0.5] = NA # non-water pixel
   #testing: to be commented
-  plot(r_binary_water_10m)
+  #plot(r_binary_water_10m)
   
   #raster to polygon
   p_binary_water <- rasterToPolygons(r_binary_water_10m, na.rm = TRUE,dissolve=TRUE)
@@ -241,16 +253,16 @@ for (eachnode in this_river_node_IDs) {
   crs(p_binary_water) <- crs(Node_ROI)
   
   #remove existing files if exists
-  file.remove(paste0(dir_output_Shapefile,'/Node_',node_id_str,'_watermask.shp'))
-  file.remove(paste0(dir_output_Shapefile,'/Node_',node_id_str,'_watermask.dbf'))
-  file.remove(paste0(dir_output_Shapefile,'/Node_',node_id_str,'_watermask.prj'))
-  file.remove(paste0(dir_output_Shapefile,'/Node_',node_id_str,'_watermask.shx'))
+  #file.remove(paste0(dir_output_Shapefile,'/Node_',node_id_str,'_watermask.shp'))
+  #file.remove(paste0(dir_output_Shapefile,'/Node_',node_id_str,'_watermask.dbf'))
+  #file.remove(paste0(dir_output_Shapefile,'/Node_',node_id_str,'_watermask.prj'))
+  #file.remove(paste0(dir_output_Shapefile,'/Node_',node_id_str,'_watermask.shx'))
   # export shapefile
   #writeOGR(p_binary_water, dsn = dir_output,layer = paste0('Reach_',i,'_watermask'), driver="ESRI Shapefile", overwrite = TRUE)
   writeOGR(p_binary_water, dirname(out_shp),sub(pattern = "(.*)\\..*$", replacement = "\\1", basename(out_shp)), "ESRI Shapefile", overwrite = TRUE)
   
   # export water mask in a raster format
-  writeRaster(r_binary_water, out_raster,overwrite=TRUE)
+  writeRaster(labelregions, out_raster,overwrite=TRUE)
   
   # save variable values to data frame
   Water_df = rbind(Water_df,data.frame(reach_id = reach_id_str,node_id = node_id_str,area_m2 = waterarea, area_precision_m2=waterarea_uncertainty,datetime =paste0(strdate,' ',image_time)))
@@ -341,7 +353,7 @@ for (eachreach in this_river_reach_IDs) {
   # calculate water index (using NDWI for now, may be updated later)
   # normalize between green band (2) and nir band (4)
   ndwi = (r_reach[[2]] - r_reach[[4]])/(r_reach[[2]] + r_reach[[4]]) 
-  
+  #plot(ndwi)
   ##Water area mapping 
   #create a water mask
   r_binary_water = ndwi
@@ -350,31 +362,34 @@ for (eachreach in this_river_reach_IDs) {
   #get each connected component
   labelregions <- clump(r_binary_water)
   #calculate water area; unit: m2
-  waterarea = GetTolpix_fromlargest_binaryimage(labelregions) * res(r_binary_water)[1] * res(r_binary_water)[2]
+  waterarea = GetTolpix_fromlargest_binaryimage(labelregions)[1] * res(r_binary_water)[1] * res(r_binary_water)[2]
   
   ##Water area uncertainty
   r_binary_water_lower = ndwi
   r_binary_water_lower[r_binary_water_lower >= (water_index_threshold+ThresholdOffset_4_uncertainty)] = 1 # water pixel
   r_binary_water_lower[r_binary_water_lower < (water_index_threshold+ThresholdOffset_4_uncertainty)] = 0 # non-water pixel
   labelregions_lower <- clump(r_binary_water_lower)
-  waterarea_lower = GetTolpix_fromlargest_binaryimage(labelregions_lower) * res(r_binary_water_lower)[1] * res(r_binary_water_lower)[2]
+  waterarea_lower = GetTolpix_fromlargest_binaryimage(labelregions_lower)[1] * res(r_binary_water_lower)[1] * res(r_binary_water_lower)[2]
   r_binary_water_upper = ndwi
   r_binary_water_upper[r_binary_water_upper >= (water_index_threshold-ThresholdOffset_4_uncertainty)] = 1 # water pixel
   r_binary_water_upper[r_binary_water_upper < (water_index_threshold-ThresholdOffset_4_uncertainty)] = 0 # non-water pixel
   labelregions_upper <- clump(r_binary_water_upper)
-  waterarea_upper = GetTolpix_fromlargest_binaryimage(labelregions_upper) * res(r_binary_water_upper)[1] * res(r_binary_water_upper)[2]
+  waterarea_upper = GetTolpix_fromlargest_binaryimage(labelregions_upper)[1] * res(r_binary_water_upper)[1] * res(r_binary_water_upper)[2]
   # using std of water areas at various thresholds as the uncertainty
   waterarea_uncertainty = sd(c(waterarea,waterarea_lower,waterarea_upper))
   
+  labelnode = GetTolpix_fromlargest_binaryimage(labelregions)[2]
+  labelregions[labelregions[]!=labelnode]=0
+  labelregions[labelregions[]!=0]=1
   #testing: to be commented
-  plot(r_binary_water)
+  #plot(labelregions)
   
   #sample to 10-m: 0.5m -> 10m with a factor of 20
-  r_binary_water_10m = aggregate(r_binary_water, fact=20)
+  r_binary_water_10m = aggregate(labelregions, fact=20)
   r_binary_water_10m[r_binary_water_10m >= 0.5] = 1 # water pixel
   r_binary_water_10m[r_binary_water_10m < 0.5] = NA # non-water pixel
   #testing: to be commented
-  plot(r_binary_water_10m)
+  #plot(r_binary_water_10m)
   
   #raster to polygon
   p_binary_water <- rasterToPolygons(r_binary_water_10m, na.rm = TRUE,dissolve=TRUE)
@@ -391,7 +406,7 @@ for (eachreach in this_river_reach_IDs) {
   writeOGR(p_binary_water, dirname(out_shp),sub(pattern = "(.*)\\..*$", replacement = "\\1", basename(out_shp)), "ESRI Shapefile", overwrite = TRUE)
   
   # export water mask in a raster format
-  writeRaster(r_binary_water, out_raster,overwrite=TRUE)
+  writeRaster(labelregions, out_raster,overwrite=TRUE)
   
   # save variable values to data frame
   Water_df_reach = rbind(Water_df_reach,data.frame(reach_id = reach_id_str,area_m2 = waterarea, area_precision_m2=waterarea_uncertainty,datetime =paste0(strdate,' ',image_time)))
