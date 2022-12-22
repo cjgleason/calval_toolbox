@@ -1,3 +1,3 @@
-"","reach_id","wse_bar","wse_precision","wse_start","wse_end","slope","slope_precision","drift_id"
+"","reach_id","mean_reach_drift_wse_m","mean_reach_drift_wse_precision_m","wse_drift_start_UTC","wse_drift_end_UTC","reach_drift_slope_m_m","reach_drift_slope_precision_m","drift_id"
 "1","78220000171",51.4494153064057,0.05,2022-07-31 17:41:02,2022-07-31 20:25:36,-0.000298121469156374,1.47572307885601e-06,"Willamette/Willamette munged drifts/SWOTCalVal_WM_GNSS_L2_Rec2_20220731T162900_20220731T210100.csv"
 "2","78220000171",51.9399107005832,0.05,2022-07-26 21:04:59,2022-07-26 23:58:41,-0.000305849544784867,1.43707654344134e-06,"Willamette/Willamette munged drifts/SWOTCalVal_WM_GNSS_L2_Rec3_20220726T155300_20220727T005100.csv"

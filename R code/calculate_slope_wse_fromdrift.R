@@ -158,8 +158,6 @@ calc_node_wse=function(drift_file,node_df,cl_df,zone){
   st_crs(spatial_node_cls)= paste0('+proj=utm +zone=',zone,' +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs')
   
 
-  write.csv(spatial_node_cls,paste0(output_directory,'node/',rivername,'_drift_node_geom.csv'))
-  
   plot(spatial_node_cls$poly_list[1:50],col='red')
   
   #ok, now we have a fully spatial object with polygons per node. There are two of them as an artifact of the centerline process, 
@@ -177,7 +175,12 @@ calc_node_wse=function(drift_file,node_df,cl_df,zone){
               node_wse_precision_m=0.05,# JPL wants precision, not variance. sd(gnss_wse,na.rm=T),
               time=mean(gnss_time_UTC),
               reach_id=reach_id[1],
-              drift_id=drift_id[1])
+              drift_id=drift_id[1],
+              node_box_x_max=node_box_x_max[1], 
+              node_box_x_min=node_box_x_min[1], 
+              node_box_y_max=node_box_y_max[1], 
+              node_box_y_min=node_box_y_min[1]
+              )
     
 
 }
@@ -296,23 +299,22 @@ node_wses=do.call(rbind,lapply(drifts,calc_node_wse,node_df=node_df,cl_df=cl_df,
   mutate(node_id=format(node_id,scientific=FALSE))
 
 
-node_geom=node_wses%>%
-  select(node_id,geometry)
+node_geom=as.data.frame(node_wses)%>%
+  select(node_id,node_box_x_min,node_box_x_max,node_box_y_min,node_box_y_max)
 
 node_wses=as.data.frame(node_wses)%>%
-  select(-geometry)
-
+  transmute(time_UTC=time,node_id=node_id,drift_id=drift_id,mean_node_pt_wse_m=node_wse,mean_node_pt_wse_precision_m=node_wse_precision_m)
 
 
 reach_stats=do.call(rbind,lapply(drifts,calc_reach_stats,spatial_reach=spatial_reach,
                                  buffer=buffer,cl_df=cl_df,zone=utm_zone,this_river_reach_ids=this_river_reach_ids))%>%
   mutate(reach_id=format(reach_id,scientific = FALSE))%>%
-  filter(!is.na(slope_precision))
+  filter(!is.na(slope_precision))%>%
+  transmute(reach_id=reach_id,mean_reach_drift_wse_m=wse_bar,mean_reach_drift_wse_precision_m=wse_precision,wse_drift_start_UTC=wse_start,
+            wse_drift_end_UTC=wse_end, reach_drift_slope_m_m=slope,reach_drift_slope_precision_m=slope_precision,drift_id=drift_id)
 
-
-
+write.csv(node_geom,paste0(output_directory,'node/',rivername,'_drift_node_geom.csv'))
 write.csv(node_wses,paste0(output_directory,'node/',rivername,'_drift_node_wses.csv'))
-
 write.csv(reach_stats,paste0(output_directory,'reach/',rivername,'_drift_reach_wse_slope.csv'))
 
  }

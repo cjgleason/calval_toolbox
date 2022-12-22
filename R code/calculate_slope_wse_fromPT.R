@@ -14,12 +14,13 @@ calculate_slope_wse_fromPT=function(keyfile,pt_files,SWORD_path,SWORD_reach,this
   #read in SWORD
   
   # 
-  # SWORD_in=nc_open(SWORD_path,verbose=FALSE)
-  # reachids=ncvar_get(SWORD_in, 'reaches/reach_id',verbose=FALSE)
-  # reach_index= which(reachids %in% this_river_reach_ids)
-  # reach_length=ncvar_get(SWORD_in, 'reaches/reach_length',verbose=FALSE)[reach_index]
+  SWORD_in=nc_open(SWORD_path,verbose=FALSE)
+  reachids=ncvar_get(SWORD_in, 'reaches/reach_id',verbose=FALSE)
+  reach_index= which(reachids %in% this_river_reach_ids)
+  reach_length=ncvar_get(SWORD_in, 'reaches/reach_length',verbose=FALSE)[reach_index]
   
-  reach_length=10000
+  reach_key=data.frame(us_reach_id=as.character(this_river_reach_ids),reach_length=reach_length) #since later we have explicit US and DS elevations with the same id, we lose the 
+  #cardinal name of 'reach_id'. Can set this to us or ds.
   
   #read in pt files
   pt_df=do.call(rbind,lapply(pt_files,read.csv))%>%
@@ -37,7 +38,7 @@ calculate_slope_wse_fromPT=function(keyfile,pt_files,SWORD_path,SWORD_reach,this
   #calculate reach wse
   reach_df=pt_df%>%
     group_by(reach_id,pt_time_UTC)%>%
-    summarise(mean_reach_pt_wse_m=mean(pt_wse),mean_pt_wse_precision_m=0.001)%>%# JPL wants precision, not variance mean(pt_wse_sd),
+    summarise(mean_reach_pt_wse_m=mean(pt_wse),mean_reach_pt_wse_precision_m=0.001)%>%# JPL wants precision, not variance mean(pt_wse_sd),
     ungroup()%>%#based on grouping, it will repeat
     mutate(reach_id=as.character(reach_id))%>%
     distinct()#based on grouping, it will repeat
@@ -63,23 +64,22 @@ calculate_slope_wse_fromPT=function(keyfile,pt_files,SWORD_path,SWORD_reach,this
   
   unique_reaches=unique(reach_df$reach_id)[!is.na(unique(reach_df$reach_id))]
   
-  slope_calculator =function(this_reach,slope_df_ds,slope_df_us){
+  slope_calculator =function(this_reach,slope_df_ds,slope_df_us,reach_key){
     library(dplyr)
-
     
     slope_calc_df_us= filter(slope_df_us,us_reach_id==this_reach)
     slope_calc_df= filter(slope_df_ds,ds_reach_id==this_reach)%>%
       left_join(slope_calc_df_us,by='pt_time_UTC')%>%
+      left_join(reach_key,by='us_reach_id')%>%
       mutate(slope=(mean_us-mean_ds)/reach_length)
     }
   
 
-
   
-  final_slope=do.call(rbind,lapply(unique_reaches,slope_calculator,slope_df_ds=slope_df_ds,slope_df_us=slope_df_us))%>%
+  final_slope=do.call(rbind,lapply(unique_reaches,slope_calculator,slope_df_ds=slope_df_ds,slope_df_us=slope_df_us,reach_key=reach_key))%>%
     ungroup()%>%
-    transmute(reach_id=ds_reach_id, pt_time_UTC=pt_time_UTC,slope=slope,slope_precision=sqrt(sd_ds^2 +sd_us^2)/reach_length)%>%
-    filter(!is.na(slope))
+    transmute(reach_id=ds_reach_id, pt_time_UTC=pt_time_UTC,reach_PT_slope_m_m=slope,reach_PT_slope_precision_m=sqrt(sd_ds^2 +sd_us^2)/reach_length)%>%
+    filter(!is.na(reach_PT_slope_m_m))
   
   
   write.csv(final_slope,'Willamette/SWORD products/reach/Willamette_PT_reach_slope.csv')
