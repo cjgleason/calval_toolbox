@@ -47,11 +47,11 @@ points(c(node_ids[point1],
            this_node_wse[point3],
            this_node_wse[point4],
            this_node_wse[point5] )  ,col='black'  ,lwd=10   )
-text(node_ids[point2],this_node_wse[point5] ,paste0('true mean: ',round(average_height_true,digits=3), ' m'))
-text(node_ids[point2],this_node_wse[point4] ,paste0('PT mean: ',round(average_height_sample,digits=3), ' m'))
+text(node_ids[point2],this_node_wse[point5] ,paste0('true mean: ',round(average_height_true,digits=2), ' m'))
+text(node_ids[point2],this_node_wse[point4] ,paste0('PT mean: ',round(average_height_sample,digits=2), ' m'))
 
 #now perturb the profile
-this_node_wse_new = this_node_wse - 1 - runif(length(this_node_wse),0.0,0.10)
+this_node_wse_new = this_node_wse - 1 - runif(length(this_node_wse),0.0,0.40)
 
 true_delta= mean(this_node_wse,na.rm=T)- mean(this_node_wse_new,na.rm=T)
 sample_delta= mean(    c(this_node_wse[point1],
@@ -76,8 +76,8 @@ points(c(node_ids[point1],
          this_node_wse_new[point3],
          this_node_wse_new[point4],
          this_node_wse_new[point5] )  ,col='blue'  ,lwd=10   )
-text(node_ids[point4],this_node_wse[point2] ,paste0('true delta: ',round(true_delta,digits=3), ' m'))
-text(node_ids[point4],this_node_wse[point1] ,paste0('PT delta: ',round(sample_delta,digits=3), ' m'))
+text(node_ids[point4],this_node_wse[point2] ,paste0('true delta: ',round(true_delta,digits=2), ' m'),col='blue')
+text(node_ids[point4],this_node_wse[point1] ,paste0('PT delta: ',round(sample_delta,digits=2), ' m'),col='blue')
 
 points(c(node_ids[point1],
          node_ids[point2],
