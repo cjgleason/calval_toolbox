@@ -1,4 +1,5 @@
-calculate_slope_wse_fromPT=function(keyfile,pt_files,SWORD_path,SWORD_reach,this_river_reach_ids){
+calculate_slope_wse_fromPT=function(keyfile,pt_files,SWORD_path,SWORD_reach,this_river_reach_ids,
+                                    alongstream_error,crossstream_error,measurement_error){
   # keyfile='Willamette/WM_Key.csv'
   # pt_files=paste0('Willamette/Willamette munged pts/',list.files('Willamette/Willamette munged pts/'))
   # SWORD_path='na_sword_v11.nc'
@@ -30,7 +31,7 @@ calculate_slope_wse_fromPT=function(keyfile,pt_files,SWORD_path,SWORD_reach,this
   #calculate node wse
   node_df=pt_df%>%
     group_by(node_id,pt_time_UTC)%>%
-    summarise(mean_node_pt_wse_m=mean(pt_wse),mean_pt_wse_precision_m=0.001)%>% #JPL wants precision, not variance mean(pt_wse_sd)
+    summarise(mean_node_pt_wse_m=mean(pt_wse),mean_pt_wse_precision_m=alongstream_error+crossstream_error+measurement_error)%>% #JPL wants precision, not variance mean(pt_wse_sd)
     ungroup()%>%#based on grouping, it will repeat
     mutate(node_id=as.character(node_id))%>%
     distinct()#based on grouping, it will repeat
@@ -38,7 +39,7 @@ calculate_slope_wse_fromPT=function(keyfile,pt_files,SWORD_path,SWORD_reach,this
   #calculate reach wse
   reach_df=pt_df%>%
     group_by(reach_id,pt_time_UTC)%>%
-    summarise(mean_reach_pt_wse_m=mean(pt_wse),mean_reach_pt_wse_precision_m=0.001)%>%# JPL wants precision, not variance mean(pt_wse_sd),
+    summarise(mean_reach_pt_wse_m=mean(pt_wse),mean_reach_pt_wse_precision_m=alongstream_error+crossstream_error+measurement_error)%>%# JPL wants precision, not variance mean(pt_wse_sd),
     ungroup()%>%#based on grouping, it will repeat
     mutate(reach_id=as.character(reach_id))%>%
     distinct()#based on grouping, it will repeat

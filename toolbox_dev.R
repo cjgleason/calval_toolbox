@@ -114,13 +114,19 @@ keyfile='Willamette/WM_Key.csv'
 PT_files=paste0('Willamette/Willamette munged PTs/',list.files('Willamette/Willamette munged PTs/'))
 SWORD_reach= read.csv('Willamette/Willamette nodes.csv')
 this_river_reach_IDs= as.numeric(as.character(unique(SWORD_reach$reach_id)))
+alongstream_error= 0.0001*200 #m error we get from the downstream slope of a reach in a node. This placeholder is a 1e-4 slope over a 200m node
+crossstream_error= 0.005 #m error we get from PT not representing cross stream superelevation/noise in a node
+measurement_error= 0.001 #m error we get from PT measurement itself 
 source('R code/calculate_slope_wse_fromPT.R')
 
 dummy=calculate_slope_wse_fromPT(keyfile=keyfile,
                                  pt_files=PT_files,
                                  SWORD_path=SWORD_path,
                                  SWORD_reach=SWORD_reach,
-                                 this_river_reach_ids=this_river_reach_IDs)
+                                 this_river_reach_ids=this_river_reach_IDs,
+                                 alongstream_error=alongstream_error,
+                                 crossstream_error=crossstream_error,
+                                 measurement_error=measurement_error)
 #-----------------------------
 
 #define what drift goes with what SWOT overpass--------------------
