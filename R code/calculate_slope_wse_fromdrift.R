@@ -71,21 +71,52 @@ reach_reachid=reachids[reach_index]
 reach_df=data.frame(lon=reach_x,lat=reach_y,reach_id=reach_reachid,reach_xmax=reach_x_max,reach_xmin=reach_x_min,
                     reach_ymax=reach_y_max,reach_ymin=reach_y_min, reach_length=reach_length)
 
-
-
-
-
-spatial_reach=st_as_sf(reach_df,coords=c('lon','lat'),remove=FALSE, crs='+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+spatial_reach=reach_df
 
 spatial_reach=spatial_reach%>%
   mutate(reach_UTM_x=LongLatToUTM(spatial_reach$lon,spatial_reach$lat,utm_zone)[,1])%>%
   mutate(reach_UTM_y=LongLatToUTM(spatial_reach$lon,spatial_reach$lat,utm_zone)[,2])
 
 spatial_reach=spatial_reach%>%
-  mutate(xmin=LongLatToUTM(spatial_reach$reach_xmin,spatial_reach$reach_ymin,utm_zone)[,1])%>%
-  mutate(xmax=LongLatToUTM(spatial_reach$reach_xmax,spatial_reach$reach_ymin,utm_zone)[,1])%>%
-  mutate(ymin=LongLatToUTM(spatial_reach$reach_xmin,spatial_reach$reach_ymin,utm_zone)[,2])%>%
-  mutate(ymax=LongLatToUTM(spatial_reach$reach_xmin,spatial_reach$reach_ymax,utm_zone)[,2])
+  mutate(xmin=as.numeric(LongLatToUTM(spatial_reach$reach_xmin,spatial_reach$reach_ymin,utm_zone)[,1]))%>%
+  mutate(xmax=as.numeric(LongLatToUTM(spatial_reach$reach_xmax,spatial_reach$reach_ymin,utm_zone)[,1]))%>%
+  mutate(ymin=as.numeric(LongLatToUTM(spatial_reach$reach_xmin,spatial_reach$reach_ymin,utm_zone)[,2]))%>%
+  mutate(ymax=as.numeric(LongLatToUTM(spatial_reach$reach_xmin,spatial_reach$reach_ymax,utm_zone)[,2]))
+
+
+make_reach_polys=function(spatial_reach){
+reach_polygon_list= st_polygon( list(rbind(c(spatial_reach['xmin'],spatial_reach['ymin']),
+
+                                     c(spatial_reach['xmin'],spatial_reach['ymax']),
+                                     c(spatial_reach['xmax'],spatial_reach['ymax']),
+                                     c(spatial_reach['xmax'],spatial_reach['ymin']),
+                                     c(spatial_reach['xmin'],spatial_reach['ymin']) )))}
+
+reach_poly_list=apply(spatial_reach, 1,make_reach_polys )
+
+spatial_reach=spatial_reach%>%
+  mutate(geometry=reach_poly_list)
+
+spatial_reach=st_as_sf(spatial_reach,sf_column_name='geometry')
+st_crs(spatial_reach)= paste0('+proj=utm +zone=',utm_zone,' +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs')
+
+if(!is.null(photo_path)){
+  #find the node IDs in that photo path
+  #REGEX form STR1(.*?)STR2 finds between them. the \\ is an escape for the .
+  #str_extract_all(x4,"(?<=STR1).+(?=STR2)")
+  photo_reaches=unlist(str_extract_all(list.files(photo_path,pattern= 'Reach_*(.*?)*\\.shp'), '(?<=Reach_).+(?=\\_water)'))
+  
+  shapefile_df_reach=do.call(rbind,lapply(list.files(photo_path,pattern= 'Reach_*(.*?)*\\.shp',full.names = TRUE),read_sf))%>%
+    transmute(reach_id= photo_reaches,
+              geometry=geometry)
+  
+  reach_row_index=which(spatial_reach$reach_id %in%  photo_reaches)
+  
+  spatial_reach$geometry[reach_row_index]=shapefile_df_reach$geometry
+}
+
+
+
 #------------------------------------------------------
 
 #centerline variables-------
@@ -332,6 +363,9 @@ node_geom=as.data.frame(node_wses)%>%
 node_wses=as.data.frame(node_wses)%>%
   transmute(time_UTC=time,node_id=node_id,drift_id=drift_id,mean_node_pt_wse_m=node_wse,mean_node_pt_wse_precision_m=node_wse_precision_m)
 
+reach_geom=as.data.frame(spatial_reach)%>%
+  select(reach_id,geometry)
+
 
 reach_stats=do.call(rbind,lapply(drifts,calc_reach_stats,spatial_reach=spatial_reach,
                                  buffer=buffer,cl_df=cl_df,zone=utm_zone,this_river_reach_ids=this_river_reach_ids))%>%
@@ -341,6 +375,7 @@ reach_stats=do.call(rbind,lapply(drifts,calc_reach_stats,spatial_reach=spatial_r
             wse_drift_end_UTC=wse_end, reach_drift_slope_m_m=slope,reach_drift_slope_precision_m=slope_precision,drift_id=drift_id)
 
 write.csv(node_geom,paste0(output_directory,'node/',rivername,'_drift_node_geom.csv'))
+write.csv(reach_geom,paste0(output_directory,'reach/',rivername,'_drift_reach_geom.csv'))
 write.csv(node_wses,paste0(output_directory,'node/',rivername,'_drift_node_wses.csv'))
 write.csv(reach_stats,paste0(output_directory,'reach/',rivername,'_drift_reach_wse_slope.csv'))
 
