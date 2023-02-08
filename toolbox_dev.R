@@ -95,10 +95,11 @@ this_river_node_IDs= as.numeric(as.character(unique(SWORD_reach$node_id)))
 utm_zone=10
 buffer=50 #m, 'extends' the reach
 rivername='Willamette'
+photo_path= 'Willamette/Watermask/Demo_output/Shapefile/'
 
 source('R code/calculate_slope_wse_fromdrift.R')
 
-dummy=calculate_sope_wse_fromdrift(SWORD_path=SWORD_path,
+dummy=calculate_slope_wse_fromdrift(SWORD_path=SWORD_path,
                                    drift_directory=munged_drift_directory,
                                    PT_directory=PT_directory,
                                    output_directory=output_directory,
@@ -106,7 +107,8 @@ dummy=calculate_sope_wse_fromdrift(SWORD_path=SWORD_path,
                                    this_river_node_ids=this_river_node_IDs,
                                    utm_zone=utm_zone, 
                                    buffer=buffer,
-                                   rivername=rivername)
+                                   rivername=rivername,
+                                   photo_path=photo_path)
 #-----------------------------
 
 #calculate slopes and heights from PTs within nodes and reaches----

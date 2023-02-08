@@ -1,10 +1,11 @@
-calculate_sope_wse_fromdrift=function(SWORD_path,drift_directory,PT_directory,output_directory,this_river_reach_ids,this_river_node_ids,
-                                       utm_zone, buffer,rivername){
+calculate_slope_wse_fromdrift=function(SWORD_path,drift_directory,PT_directory,output_directory,this_river_reach_ids,this_river_node_ids,
+                                       utm_zone, buffer,rivername, photo_path=NULL){
   
   library(sf)
   library(dplyr)
   library(rgdal)
   library(ncdf4)
+  library(stringr)
 
 LongLatToUTM<-function(x,y,zone){
   xy <- data.frame(id = 1:length(x), X = x, Y = y)
@@ -108,7 +109,7 @@ cl_df=cl_df%>%
 #------------------------------------------------------
 
 #calculate node wse----------------------------------
-calc_node_wse=function(drift_file,node_df,cl_df,zone){
+calc_node_wse=function(drift_file,node_df,cl_df,zone,photo_path){
 
   
   drift_in=read.csv(drift_file,header=TRUE,stringsAsFactors = FALSE)%>%
@@ -167,6 +168,28 @@ calc_node_wse=function(drift_file,node_df,cl_df,zone){
     group_by(node_id)%>%
     filter(row_number()==1)
   
+  #ok. now, if we have a classified image we want to use for a node, we should use it instead
+  #set implicitly by passing the argument
+  
+
+  if(!is.null(photo_path)){
+    #find the node IDs in that photo path
+    #REGEX form STR1(.*?)STR2 finds between them. the \\ is an escape for the .
+    #str_extract_all(x4,"(?<=STR1).+(?=STR2)")
+    photo_nodes=unlist(str_extract_all(list.files(photo_path,pattern= 'Node_*(.*?)*\\.shp'), '(?<=Node_).+(?=\\_water)'))
+    
+    shapefile_df=do.call(rbind,lapply(list.files(photo_path,pattern= 'Node_*(.*?)*\\.shp',full.names = TRUE),read_sf))%>%
+    transmute(node_id= photo_nodes,
+                geometry=geometry)
+    
+    row_index=which(final_node_df$node_id %in%  photo_nodes)
+    
+    final_node_df$poly_list[row_index]=shapefile_df$geometry
+  }
+  
+  geometry_saver=data.frame(transmute(final_node_df,geometry=poly_list))
+
+  
   #make drifts spatial for point-in-polygon operation
   spatial_drift=st_as_sf(drift_in,coords=c('UTM_x','UTM_y'),crs=paste0('+proj=utm +zone=',zone,' +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs') ) 
   points_in_node=st_intersection(spatial_drift,final_node_df)%>%
@@ -180,7 +203,9 @@ calc_node_wse=function(drift_file,node_df,cl_df,zone){
               node_box_x_min=node_box_x_min[1], 
               node_box_y_max=node_box_y_max[1], 
               node_box_y_min=node_box_y_min[1]
-              )
+              )%>%
+   left_join(geometry_saver,by='node_id')
+  
     
 
 }
@@ -295,12 +320,14 @@ calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river
 
 drifts = paste0(drift_directory,list.files(drift_directory))
 
-node_wses=do.call(rbind,lapply(drifts,calc_node_wse,node_df=node_df,cl_df=cl_df,zone=utm_zone))%>%
-  mutate(node_id=format(node_id,scientific=FALSE))
-
+node_wses=do.call(rbind,lapply(drifts,calc_node_wse,node_df=node_df,cl_df=cl_df,zone=utm_zone,photo_path=photo_path))%>%
+  mutate(node_id=format(node_id,scientific=FALSE))%>%
+  mutate(geometry= geometry.x)%>%
+  as.data.frame()%>%
+  select(-geometry.x,-geometry.y,-poly_list)
 
 node_geom=as.data.frame(node_wses)%>%
-  select(node_id,node_box_x_min,node_box_x_max,node_box_y_min,node_box_y_max)
+  select(node_id,node_box_x_min,node_box_x_max,node_box_y_min,node_box_y_max,geometry)
 
 node_wses=as.data.frame(node_wses)%>%
   transmute(time_UTC=time,node_id=node_id,drift_id=drift_id,mean_node_pt_wse_m=node_wse,mean_node_pt_wse_precision_m=node_wse_precision_m)
