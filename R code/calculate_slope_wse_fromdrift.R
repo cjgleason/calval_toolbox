@@ -56,13 +56,13 @@ reach_x=ncvar_get(SWORD_in, 'reaches/x',verbose=FALSE)[reach_index]
 
 reach_y=ncvar_get(SWORD_in, 'reaches/y',verbose=FALSE)[reach_index]
 
-reach_x_max=ncvar_get(SWORD_in, 'reaches/x_max',verbose=FALSE)[reach_index]
+reach_x_max=ncvar_get(SWORD_in, 'reaches/x_max',verbose=FALSE)[reach_index] 
 
-reach_x_min=ncvar_get(SWORD_in, 'reaches/x_min',verbose=FALSE)[reach_index]
+reach_x_min=ncvar_get(SWORD_in, 'reaches/x_min',verbose=FALSE)[reach_index] 
 
-reach_y_max=ncvar_get(SWORD_in, 'reaches/y_max',verbose=FALSE)[reach_index]
+reach_y_max=ncvar_get(SWORD_in, 'reaches/y_max',verbose=FALSE)[reach_index] 
 
-reach_y_min=ncvar_get(SWORD_in, 'reaches/y_min',verbose=FALSE)[reach_index]
+reach_y_min=ncvar_get(SWORD_in, 'reaches/y_min',verbose=FALSE)[reach_index] 
 
 reach_length=ncvar_get(SWORD_in, 'reaches/reach_length',verbose=FALSE)[reach_index]
 
@@ -78,10 +78,10 @@ spatial_reach=spatial_reach%>%
   mutate(reach_UTM_y=LongLatToUTM(spatial_reach$lon,spatial_reach$lat,utm_zone)[,2])
 
 spatial_reach=spatial_reach%>%
-  mutate(xmin=as.numeric(LongLatToUTM(spatial_reach$reach_xmin,spatial_reach$reach_ymin,utm_zone)[,1]))%>%
-  mutate(xmax=as.numeric(LongLatToUTM(spatial_reach$reach_xmax,spatial_reach$reach_ymin,utm_zone)[,1]))%>%
-  mutate(ymin=as.numeric(LongLatToUTM(spatial_reach$reach_xmin,spatial_reach$reach_ymin,utm_zone)[,2]))%>%
-  mutate(ymax=as.numeric(LongLatToUTM(spatial_reach$reach_xmin,spatial_reach$reach_ymax,utm_zone)[,2]))
+  mutate(xmin=-buffer + as.numeric(LongLatToUTM(spatial_reach$reach_xmin,spatial_reach$reach_ymin,utm_zone)[,1]))%>%
+  mutate(xmax=buffer + as.numeric(LongLatToUTM(spatial_reach$reach_xmax,spatial_reach$reach_ymin,utm_zone)[,1]))%>%
+  mutate(ymin=-buffer + as.numeric(LongLatToUTM(spatial_reach$reach_xmin,spatial_reach$reach_ymin,utm_zone)[,2]))%>%
+  mutate(ymax=buffer + as.numeric(LongLatToUTM(spatial_reach$reach_xmin,spatial_reach$reach_ymax,utm_zone)[,2]))
 
 
 make_reach_polys=function(spatial_reach){
@@ -246,28 +246,38 @@ calc_node_wse=function(drift_file,node_df,cl_df,zone,photo_path){
 calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river_reach_ids){
   
 
+
   drift_in=read.csv(drift_file,header=TRUE,stringsAsFactors = FALSE)%>%
     mutate(UTM_x=LongLatToUTM(gnss_Lon,gnss_Lat,zone)[,1])%>%
     mutate(UTM_y=LongLatToUTM(gnss_Lon,gnss_Lat,zone)[,2])%>%
     mutate(gnss_time_UTC=as.POSIXct(gnss_time_UTC))#needed as when it gets written to csv it becomes not a posix object
   
-  calc_wse_stats=function(reach_id_search, drift_in,spatial_reach,buffer,this_river_reach_ids){
+  calc_wse_stats=function(reach_id_search, drift_in,spatial_reach,buffer){
     
     
     reach_id_filtered= filter(spatial_reach,reach_id==reach_id_search)
-    relevant_drift_index= which(  drift_in$gnss_Lat>reach_id_filtered$reach_ymin &
-                                  drift_in$gnss_Lat<reach_id_filtered$reach_ymax &
-                                  drift_in$gnss_Lon>reach_id_filtered$reach_xmin &
-                                  drift_in$gnss_Lon<reach_id_filtered$reach_xmax)
+ 
     
-    filtered_drift=drift_in[relevant_drift_index,]
+    spatial_drift=st_as_sf(drift_in,coords=c('UTM_x','UTM_y'),crs=paste0('+proj=utm +zone=',zone,' +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs') ) 
+    points_in_reach=st_intersection(spatial_drift,reach_id_filtered)
     
-    if (nrow(filtered_drift)==0){
+    # old aspatial code
+    # 
+    # relevant_drift_index= which(  drift_in$gnss_Lat>reach_id_filtered$reach_ymin &
+    #                               drift_in$gnss_Lat<reach_id_filtered$reach_ymax &
+    #                               drift_in$gnss_Lon>reach_id_filtered$reach_xmin &
+    #                               drift_in$gnss_Lon<reach_id_filtered$reach_xmax)
+    # 
+    # filtered_drift=drift_in[relevant_drift_index,]
+    
+    if (nrow(  points_in_reach)==0){
+      
+   
       output=data.frame(reach_id=reach_id_search,
                         wse_bar=NA,
                         wse_precision=NA,
-                        wse_start= as.POSIXct('2000-01-01 12:00:00'),
-                        wse_end= as.POSIXct('2000-01-01 12:00:00'),
+                        wse_start= '2000-01-01 12:00:00',
+                        wse_end= '2000-01-01 12:00:00',
                         slope= NA,
                         slope_precision=NA,
                         drift_id=drift_file)
@@ -275,19 +285,36 @@ calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river
       return(output)
     }
 
-    reach_wse_bar_m=mean(drift_in$gnss_wse[relevant_drift_index],na.rm=T)
+    ##old aspatial code
+    # reach_wse_bar_m=mean(drift_in$gnss_wse[relevant_drift_index],na.rm=T)
+    # reach_wse_precision_m =0.05 # JPL wants precision, not variance. sd(drift_in$gnss_wse[relevant_drift_index],na.rm=T)
+    # wse_time_start= min(drift_in$gnss_time_UTC[relevant_drift_index])
+    # wse_time_end=max(drift_in$gnss_time_UTC[relevant_drift_index])
+    
+
+    reach_wse_bar_m=mean( points_in_reach$gnss_wse,na.rm=T)
     reach_wse_precision_m =0.05 # JPL wants precision, not variance. sd(drift_in$gnss_wse[relevant_drift_index],na.rm=T)
-    wse_time_start= min(drift_in$gnss_time_UTC[relevant_drift_index])
-    wse_time_end=max(drift_in$gnss_time_UTC[relevant_drift_index])
+    wse_time_start= min(points_in_reach$gnss_time_UTC,na.rm=T)
+    wse_time_end=max(points_in_reach$gnss_time_UTC,na.rm=T)
+    
+
+
     
     #take points within some distance of xmin, ymin, xmax, ymax to define the slope
     #we do not use the points in the middle
     #we have a 'buffer' variable for this
     
   this_cl=filter(cl_df,reach_id==reach_id_search)
+
   cl_start=this_cl[1,]
   cl_end=this_cl[nrow(this_cl),]
   
+  # plot(drift_in$gnss_Lon,drift_in$gnss_Lat,col='green')
+  # points(this_cl$lon,this_cl$lat,col='black')
+  # points(cl_start$lon,cl_start$lat,col='red')
+  # points(cl_end$lon,cl_end$lat,col='red')
+  # points( points_in_reach$gnss_Lon,points_in_reach$gnss_Lat,col='blue')
+
   cl_start_search_x1=cl_start$cl_UTM_x-buffer
   cl_start_search_x2=cl_start$cl_UTM_x+buffer
   cl_end_search_x1=cl_end$cl_UTM_x-buffer
@@ -321,28 +348,47 @@ calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river
   slope= (mean(slope_start_elevations)- mean(slope_end_elevations)) / cl_distance
   slope_sd= (sqrt(sd(slope_start_elevations)^2+sd(slope_end_elevations)^2)) / cl_distance
 
-  if (is.na(slope_sd)){wse_bar=NA}#kluge that tells us the whole reach wasn't floated
+  if (is.na(slope_sd)){reach_wse_bar_m=NA}#kluge that tells us the whole reach wasn't floated
     
 
-
-    output=data.frame(reach_id=reach_id_search,
+ 
+    output1=data.frame(reach_id=reach_id_search,
                       wse_bar=reach_wse_bar_m,
                       wse_precision=reach_wse_precision_m,
-                      wse_start= wse_time_start,
-                      wse_end= wse_time_end,
+                      wse_start= as.character(wse_time_start),
+                      wse_end= as.character(wse_time_end),
                       slope= slope,
                       slope_precision=slope_sd,
                       drift_id=drift_file)
+
+
     
-    #print(output)
+    return(output1)
+    
+
+    
   }
   
+  output2 = lapply(this_river_reach_ids,calc_wse_stats,drift_in=drift_in,spatial_reach=spatial_reach,buffer=buffer)
+ 
   
-  reach_ids=this_river_reach_ids
-  
-  output1 = do.call(rbind,lapply(reach_ids,calc_wse_stats,drift_in=drift_in,spatial_reach=spatial_reach,buffer=buffer))%>%
+ output3=do.call(rbind,output2)%>%
      filter(!is.na(wse_bar))
+
+
   
+  # output2= calc_wse_stats(this_river_reach_ids[2],drift_in,spatial_reach,buffer)
+
+# count=0
+# output2=matrix(nrow=100,ncol=8)
+#  for (reachid in this_river_reach_ids){
+#   temp=calc_wse_stats(reachid,drift_in,spatial_reach,buffer
+#   output2[nrow(temp),]
+#   
+# 
+#  }
+
+  return(output3)
 
   
 }
@@ -365,6 +411,7 @@ node_wses=as.data.frame(node_wses)%>%
 
 reach_geom=as.data.frame(spatial_reach)%>%
   select(reach_id,geometry)
+
 
 
 reach_stats=do.call(rbind,lapply(drifts,calc_reach_stats,spatial_reach=spatial_reach,

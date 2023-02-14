@@ -27,13 +27,15 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
   Info_event_start=ncvar_get(gnss_nc,'infoEventStartTime')
   Info_event_end=ncvar_get(gnss_nc,'infoEventEndTime')
   
+
+  
   Info_df=data.frame(Event_code=Info_event, Event_start= Info_event_start, Event_end=Info_event_end)%>%
     mutate(Event_start_UTC = as.POSIXct(Event_start,origin='2000-01-01 00:00:00',tz='UTC'))%>%
     mutate(Event_end_UTC = as.POSIXct(Event_end,origin='2000-01-01 00:00:00',tz='UTC' ))%>%
     select(-Event_end,-Event_start)%>%
     #add 2 minutes to the event codes
-    mutate(Event_start_UTC=Event_start_UTC-2*60)%>%
-    mutate(Event_end_UTC=Event_end_UTC+2*60)%>%
+     mutate(Event_start_UTC=Event_start_UTC-1*60)%>%
+     mutate(Event_end_UTC=Event_end_UTC+1*60)%>%
     filter(Event_code=='Bridge' | Event_code == 'Powerlines' )
   
   

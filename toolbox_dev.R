@@ -48,7 +48,8 @@ if(!identical(unmunged_drifts,character(0))){
 
 #-------------------------------------------------
 
-# munge PTs if needed------
+
+#munge PTs if needed------
 dist_thresh=150 # 150m
 time_thresh= 15*60 #minutes as seconds, centered, so 15 =30 mins total time
 GNSS_sd_thresh=0.15 # 15cm how much variance do you want in the GNSS data when it is within the distance threshold?
