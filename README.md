@@ -76,7 +76,7 @@ Empty directories are created to store munged data outputs for PTs, GNSS drifts,
 
 - The function reads in the netCDF GNSS drifts sourced from PO.DAAC and creates a data frame in an xml format for cleaning and quality flagging.
 
-- Event code times are converted to POSIXct UTC. A two-minute buffer is added to the start and end time of the event codes, before powerline and bridge events are filtered out.
+- Event code times are converted to POSIXct UTC. A one-minute buffer is added to the start and end time of the event codes, before powerline and bridge events are filtered out.
 
 - All of the GNSS times in the TAI format are converted to POSIXct UTC. Only data with the surface flag of 12 and motion code of 2 are kept. Data with an uncertainty greater than 5cm are filtered out.
 
