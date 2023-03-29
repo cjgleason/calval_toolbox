@@ -15,7 +15,7 @@ calculate_area_from_imagery=function(input_list,
                                      water_index_threshold,
                                      dir_output){
 
-print(input_list)
+#print(input_list)
     this_river_reach_ids=input_list$reach
     this_river_node_ids=input_list$node
     reach_or_node=input_list$reach_or_node
@@ -55,6 +55,8 @@ node_index= which(nodeids %in% this_river_node_ids)
 #centerline variables-------
 cl_reach_ids= ncvar_get(SWORD_in, 'centerlines/reach_id',verbose=FALSE)
 cl_index=which(cl_reach_ids %in% this_river_reach_ids)
+    
+print(this_river_reach_ids)
 
 cl_x=ncvar_get(SWORD_in, 'centerlines/x',verbose=FALSE)[cl_index]
 cl_y=ncvar_get(SWORD_in, 'centerlines/y',verbose=FALSE)[cl_index]
@@ -65,6 +67,7 @@ cl_df=data.frame(reach_id=cl_reach_ids[cl_index],lon=cl_x,lat=cl_y,cl_id=cl_id,n
   filter(!is.na(lat))
 
 cl_df=st_as_sf(cl_df,coords=c('lon','lat'),remove=FALSE, crs='+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+
 
 cl_df=cl_df%>%
   mutate(cl_UTM_x=LongLatToUTM(cl_df$lon,cl_df$lat,utm_zone)[,1])%>%
@@ -242,20 +245,18 @@ water_area= total_cells*x_size*y_size
 
 
 
-#write data frame
-if(reach_or_node=='node'){
 output=data.frame(node_id=this_river_node_ids,reach_id=this_river_reach_ids,water_area_m2=water_area,
                      image_name=image_name,datetime=datetime)
-    }else{
-    output=data.frame(reach_id=this_river_reach_ids,water_area_m2=water_area,
-                     image_name=image_name,datetime=datetime)
-    }
 
-
-    
+   
     } #end image function
     
 output=do.call(rbind,lapply(image_list,classify_water,spatial_object= spatial_object,  water_index_threshold=water_index_threshold)    )
+    
+
+    write.csv(output,paste0(dir_output,'CSV/','reach_',this_river_reach_ids,'_node_',this_river_node_ids,'.csv'))
+ 
+
     
 
     } #end total function
