@@ -4,26 +4,31 @@
 #
 ###########
 # load library 
-library(raster)
-library(rgdal)
-library(rgeos)
-library(ncdf4)
-library(sf)
-library(dplyr)
-library(sp)
-library(spatstat)
+library(raster,quietly = TRUE,warn.conflicts=FALSE)
+library(rgdal, quietly = TRUE,warn.conflicts=FALSE)
+library(rgeos, quietly = TRUE,warn.conflicts=FALSE)
+library(ncdf4,quietly = TRUE,warn.conflicts=FALSE)
+library(sf,quietly = TRUE,warn.conflicts=FALSE)
+library(dplyr, quietly = TRUE,warn.conflicts=FALSE)
+library(sp,quietly = TRUE,warn.conflicts=FALSE)
+library(spatstat,quietly = TRUE,warn.conflicts=FALSE)
+
 
 #path of input image 
-Inputimagefile = '/Volumes/CIRES_8T/Willamette2022_Pleiades/WillametteROI/PHR_2022_07_25_Willamette_32610__shifted_to__GoogleAeroport32610.tif'
+Inputimagefile = '/nas/cee-water/cjgleason/calval/willamette_geotiffs/raw/WillametteROI/PHR_2022_07_29_Willamette_32610__shifted_to__WilaBing32610.tif'
 #path of input SWORD data (netcdf)
-SWORD_path='/Volumes/CIRES_8T/SWORD/netcdf/na_sword_v14.nc'
+SWORD_path='/nas/cee-water/cjgleason/SWORDv14/Reaches_Nodes/netcdf/na_sword_v11.nc'
+
 #output dir
-dir_output = '/Volumes/CIRES_8T/Willamette2022_Pleiades/Output/'
+dir_output = '/nas/cee-water/cjgleason/calval_toolbox/Willamette/Watermask/'
 
 #selected reach and nodes to be processed
-this_river_reach_IDs <- c(78220000231)
-this_river_node_IDs <- c(78220000230031,78220000230041,78220000230051)
-  #c(78339200060171,78339200060181)
+this_river_reach_IDs <- c(78220000191,78220000181,78220000171)
+this_river_node_IDs <- c(78220000190011,78220000180811,78220000180661,78220000180511,78220000180351,78220000180341,78220000180201,
+78220000180191,78220000170571,78220000170401,78220000170281,78220000170161,78220000170011)
+
+
+
 
 #utm_zone (based on imagery)
 utm_zone = 10
@@ -117,7 +122,14 @@ nodeIDs=ncvar_get(SWORD_in,'nodes/node_id',verbose=FALSE)
 #data frame for output variable values of interest
 Water_df = data.frame()
 
+
+
 for (eachnode in this_river_node_IDs) {
+    #check for the ROI to see if it exists
+    
+    if(!file.exists(if(!file.exists(paste0(dir_output_ROI,'/',
+                       'NodeID_',eachnode,'_ROI.shp')){
+    
   node_index= which(nodeIDs %in% eachnode)
   #for the section between current node and next node
   node_curr_next <- c(node_index,node_index+1)
@@ -177,10 +189,11 @@ for (eachnode in this_river_node_IDs) {
   NodeROI_polys_spatialwref = SpatialPolygonsDataFrame(NodeROI_polys_spatial,tempdata)
   
   shapefile(x = NodeROI_polys_spatialwref, file = paste0(dir_output_ROI,'/','NodeID_',eachnode,'_ROI.shp'),overwrite=TRUE)
+        }
   
   # read ROI shapefile
   Node_ROI = readOGR(paste0(dir_output_ROI,'/','NodeID_',eachnode,'_ROI.shp'), layer = paste0('NodeID_',eachnode,'_ROI'))
-  # reproject ROI to image projection (not necessary if the projections are the same)
+  # reproject ROI to image projection (not neceswatesary if the projections are the same)
   Node_ROI = spTransform(Node_ROI, crs(Pleiades_image))
   
   Imagefilename = basename(Inputimagefile)

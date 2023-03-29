@@ -5,7 +5,7 @@ setwd('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/
 #setwd('C:/Users/confluence/Desktop/calval_toolbox/')
 #setwd('C:/Users/colin/Desktop/calval_toolbox/')
 
-#PT paths
+#PT paths---------
 PT_data_directory='Willamette/Willamette raw PTs/'
 QA_QC_PT_output_directory='Willamette/Willamette munged PTs/'
 flagged_PT_output_directory='Willamette/Willamette flagged PTs/'
@@ -42,7 +42,7 @@ if(!identical(unmunged_drifts,character(0))){
   cl=makeCluster(16)
   
   dummy=parLapply(cl=cl,unmunged_drifts,create_gnss_dataframe,
-               gnss_drift_data_directory=GNSS_drift_data_directory,output_directory=QA_QC_drift_output_directory)
+                  gnss_drift_data_directory=GNSS_drift_data_directory,output_directory=QA_QC_drift_output_directory)
   stopCluster(cl)
 }
 
@@ -69,20 +69,20 @@ unmunged_PTs=setdiff(raw_PT,c(flagged_PTs,QA_QC_PTs))
 
 if(!identical(unmunged_PTs,character(0))){
   source('R code/correct_PT_to_GNSS.R')
-
+  
   cl=makeCluster(16)
-
+  
   dummy=parLapply(cl,unmunged_PTs,correct_pt_to_gnss,
-               pt_key_file=PT_key_file,
-               dist_thresh=dist_thresh,
-               time_thresh=time_thresh,
-               pt_data_directory=PT_data_directory,
-               gnss_drift_data_directory=QA_QC_drift_output_directory,
-               QA_QC_pt_output_directory=QA_QC_PT_output_directory,
-               flagged_pt_output_directory=flagged_PT_output_directory,
-               gnss_sd_thresh=GNSS_sd_thresh,
-               offset_sd_thresh=offset_sd_thresh,
-               change_thresh_15_min=change_thresh_15_min)
+                  pt_key_file=PT_key_file,
+                  dist_thresh=dist_thresh,
+                  time_thresh=time_thresh,
+                  pt_data_directory=PT_data_directory,
+                  gnss_drift_data_directory=QA_QC_drift_output_directory,
+                  QA_QC_pt_output_directory=QA_QC_PT_output_directory,
+                  flagged_pt_output_directory=flagged_PT_output_directory,
+                  gnss_sd_thresh=GNSS_sd_thresh,
+                  offset_sd_thresh=offset_sd_thresh,
+                  change_thresh_15_min=change_thresh_15_min)
   
   stopCluster(cl)
 }
@@ -101,15 +101,15 @@ photo_path= 'Willamette/Watermask/Demo_output/Shapefile/'
 source('R code/calculate_slope_wse_fromdrift.R')
 
 dummy=calculate_slope_wse_fromdrift(SWORD_path=SWORD_path,
-                                   drift_directory=munged_drift_directory,
-                                   PT_directory=PT_directory,
-                                   output_directory=output_directory,
-                                   this_river_reach_ids=this_river_reach_IDs,
-                                   this_river_node_ids=this_river_node_IDs,
-                                   utm_zone=utm_zone, 
-                                   buffer=buffer,
-                                   rivername=rivername,
-                                   photo_path=photo_path)
+                                    drift_directory=munged_drift_directory,
+                                    PT_directory=PT_directory,
+                                    output_directory=output_directory,
+                                    this_river_reach_ids=this_river_reach_IDs,
+                                    this_river_node_ids=this_river_node_IDs,
+                                    utm_zone=utm_zone, 
+                                    buffer=buffer,
+                                    rivername=rivername,
+                                    photo_path=photo_path)
 #-----------------------------
 
 #calculate slopes and heights from PTs within nodes and reaches----
@@ -149,33 +149,42 @@ dummy=select_appropriate_drift(passname=passname,
                                keyfile=keyfile)
 #-----------------------------
 
+#calcluate areas from images----
+utm_zone = 10
+#image acquisition time (based on imagery)
+image_time = '11:00'
+#scale max width (in cases of under/overestimated or centerline offset)
+scale_maxwidth = 3
+
+##other parameter setting
+#Threshold for water mapping
+water_index_threshold = 0.2
+#Offset the threshold to calculate water area uncertainty
+ThresholdOffset_4_uncertainty = 0.1
+
+#path of input image 
+Inputimagefile = '/nas/cee-water/cjgleason/calval/willamette_geotiffs/raw/WillametteROI/PHR_2022_07_29_Willamette_32610__shifted_to__WilaBing32610.tif'
+#path of input SWORD data (netcdf)
+SWORD_path='/nas/cee-water/cjgleason/SWORDv14/Reaches_Nodes/netcdf/na_sword_v11.nc'
+#output dir
+dir_output = '/nas/cee-water/cjgleason/calval_toolbox/Willamette/Watermask/'
+
+#selected reach and nodes to be processed
+this_river_reach_IDs <- c(78220000191,78220000181,78220000171)
+this_river_node_IDs <- c(78220000190011,78220000180811,78220000180661,78220000180511,78220000180351,78220000180341,78220000180201,
+                         78220000180191,78220000170571,78220000170401,78220000170281,78220000170161,78220000170011)
 
 
-
-
-
-
-
-# #pull lidar heights from lidar rasters (very slow)----
-# SWORD_path='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/na_sword_v11.nc'
-# library(readxl)
-# metadatain= read_excel('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/CTR_Aug21_nodes_reaches.xlsx')
-# this_river_reach_IDs= as.numeric(as.character(unique(metadatain$reach_id)))
-# this_river_node_IDs= as.numeric(as.character(unique(metadatain$node_id)))
-# utm_zone=18
-# lidar_date= '08-30-2021 12:00:00'
-# raster_path='D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/Rasters/'
-# output_path= 'D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/Taylor data 7 12/lidar wse products/'
-# river_name= 'Connecticut'
-# 
-# 
-# 
-# source('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/R code/sample_lidar_at_SWOT.R')
-# 
-# dummy=sample_lidar_at_SWOT(SWORD_path=SWORD_path,this_river_node_IDs= this_river_node_IDs,this_river_reach_IDs= this_river_reach_IDs,
-#                            utm_zone=utm_zone,lidar_date=lidar_date,raster_path=raster_path,output_path=output_path,river_name=river_name)
-# #-----------------------------
-
+source('/nas/cee-water/cjgleason/calval_toolbox/R code/calculate_area_from_imagery.R')
+calculate_area_from_imagery( Inputimagefile=Inputimagefile,
+                             utm_zone=utm_zone,image_time=image_time,scale_maxwidth=scale_maxwidth,
+                             water_index_threshold=water_index_threshold,
+                             ThresholdOffset_4_uncertainty=ThresholdOffset_4_uncertainty,
+                             SWORD_path=SWORD_path,
+                             dir_output=dir_output,
+                             this_river_reach_IDs=this_river_reach_IDs,
+                             this_river_node_IDs=this_river_node_IDs)
+#------
 
 
 
