@@ -45,6 +45,7 @@ node_nodeid=nodeids[node_index]
 node_df=data.frame(lon=node_x,lat=node_y,node_id=node_nodeid,node_wmax=node_max_width,
                    node_length=node_length,reach_id=node_reachid)
 
+
 node_df= node_df%>%
   mutate(node_UTM_x=LongLatToUTM(node_df$lon,node_df$lat,utm_zone)[,1])%>%
   mutate(node_UTM_y=LongLatToUTM(node_df$lon,node_df$lat,utm_zone)[,2])
@@ -196,6 +197,7 @@ calc_node_wse=function(drift_file,node_df,cl_df,zone,photo_path){
   #so let's trim one
   
   final_node_df= spatial_node_cls%>%
+   
     group_by(node_id)%>%
     filter(row_number()==1)
   
@@ -407,7 +409,7 @@ node_geom=as.data.frame(node_wses)%>%
   select(node_id,node_box_x_min,node_box_x_max,node_box_y_min,node_box_y_max,geometry)
 
 node_wses=as.data.frame(node_wses)%>%
-  transmute(time_UTC=time,node_id=node_id,drift_id=drift_id,mean_node_pt_wse_m=node_wse,mean_node_pt_wse_precision_m=node_wse_precision_m)
+  transmute(time_UTC=time,node_id=node_id,drift_id=drift_id,mean_node_drift_wse_m=node_wse,mean_node_drift_wse_precision_m=node_wse_precision_m)
 
 reach_geom=as.data.frame(spatial_reach)%>%
   select(reach_id,geometry)

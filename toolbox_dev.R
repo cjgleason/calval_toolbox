@@ -1,7 +1,7 @@
 library(dplyr)
 library(parallel)
 
-setwd('D:/OneDrive -\ University of Massachusetts/calval/Toolbox/calval_toolbox/')
+setwd('/nas/cee-water/cjgleason/calval/Processed data/UMass/UMass_dump1_netCDFs/')
 #setwd('C:/Users/confluence/Desktop/calval_toolbox/')
 #setwd('C:/Users/colin/Desktop/calval_toolbox/')
 
@@ -149,42 +149,79 @@ dummy=select_appropriate_drift(passname=passname,
                                keyfile=keyfile)
 #-----------------------------
 
-#calcluate areas from images----
+#calcluate areas from images------------------
+a=Sys.time()
+
+library(parallel)
+source('/nas/cee-water/cjgleason/calval_toolbox/R code/calculate_area_from_imagery.R')
+
 utm_zone = 10
-#image acquisition time (based on imagery)
-image_time = '11:00'
 #scale max width (in cases of under/overestimated or centerline offset)
 scale_maxwidth = 3
-
+datetime=as.POSIXct('2022-07-29 19:00:00')
 ##other parameter setting
 #Threshold for water mapping
 water_index_threshold = 0.2
-#Offset the threshold to calculate water area uncertainty
-ThresholdOffset_4_uncertainty = 0.1
+reach_or_node='node'
 
 #path of input image 
-Inputimagefile = '/nas/cee-water/cjgleason/calval/willamette_geotiffs/raw/WillametteROI/PHR_2022_07_29_Willamette_32610__shifted_to__WilaBing32610.tif'
+image_list = paste0('/nas/cee-water/cjgleason/calval/willamette_geotiffs/raw/WillametteROI/',
+                    list.files('/nas/cee-water/cjgleason/calval/willamette_geotiffs/raw/WillametteROI/'))
+
 #path of input SWORD data (netcdf)
 SWORD_path='/nas/cee-water/cjgleason/SWORDv14/Reaches_Nodes/netcdf/na_sword_v11.nc'
 #output dir
 dir_output = '/nas/cee-water/cjgleason/calval_toolbox/Willamette/Watermask/'
 
-#selected reach and nodes to be processed
-this_river_reach_IDs <- c(78220000191,78220000181,78220000171)
-this_river_node_IDs <- c(78220000190011,78220000180811,78220000180661,78220000180511,78220000180351,78220000180341,78220000180201,
+# #selected reach and nodes to be processed
+this_river_reach_ids <- c(78220000191,78220000181,78220000171)
+this_river_node_ids <- c(78220000190011,78220000180811,78220000180661,78220000180511,
+                        78220000180351,78220000180341,78220000180201,
                          78220000180191,78220000170571,78220000170401,78220000170281,78220000170161,78220000170011)
 
+reach=c(78220000191,
+        78220000181,78220000181,78220000181,78220000181,78220000181,78220000181,78220000181,
+        78220000171,78220000171,78220000171,78220000171,78220000171,
+        78220000191,78220000181,78220000171)
+        
+node=c(78220000190011, 
+       78220000180811,78220000180661,78220000180511,78220000180351,78220000180341,78220000180201,78220000180191,
+       78220000170571,78220000170401,78220000170281,78220000170161,78220000170011,
+       'NA','NA','NA')
 
-source('/nas/cee-water/cjgleason/calval_toolbox/R code/calculate_area_from_imagery.R')
-calculate_area_from_imagery( Inputimagefile=Inputimagefile,
-                             utm_zone=utm_zone,image_time=image_time,scale_maxwidth=scale_maxwidth,
-                             water_index_threshold=water_index_threshold,
-                             ThresholdOffset_4_uncertainty=ThresholdOffset_4_uncertainty,
-                             SWORD_path=SWORD_path,
-                             dir_output=dir_output,
-                             this_river_reach_IDs=this_river_reach_IDs,
-                             this_river_node_IDs=this_river_node_IDs)
-#------
+reach_or_node=c(rep('node',times=13),rep('reach',times=3))
+
+# reach=c(78220000191)
+        
+# node=c(78220000190011)
+
+# reach_or_node='node'
+
+
+df=data.frame(reach=reach,node=node,reach_or_node=reach_or_node)
+ input_list=do.call("mapply", c(list, df, SIMPLIFY = FALSE, USE.NAMES=FALSE))
+#print(input_list)
+ cl=makeCluster(16)
+dummy=do.call(rbind,parLapply(cl,input_list,calculate_area_from_imagery,image_list=image_list,
+                                     utm_zone=utm_zone,
+                                     datetime=datetime,
+                                     scale_maxwidth=scale_maxwidth, 
+                                     SWORD_path=SWORD_path,
+                                     water_index_threshold=water_index_threshold,
+                                    dir_output=dir_output  ))
+ write.csv(dummy,paste0(dir_output,'CSV/','willamete_epxeriment_area_df.csv'))
+stopCluster(cl)
+
+# calculate_area_from_imagery(input_list=input_list,
+#                             image_list=image_list,
+#                                      utm_zone=utm_zone,
+#                                      datetime=datetime,
+#                                      scale_maxwidth=scale_maxwidth, 
+#                                      SWORD_path=SWORD_path,
+#                                      water_index_threshold=water_index_threshold,
+#                                     dir_output=dir_output  )
+print(Sys.time()-a)#calcluate areas from images----
+#------00000000000000
 
 
 

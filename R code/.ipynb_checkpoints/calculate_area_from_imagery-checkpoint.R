@@ -27,7 +27,8 @@ library(ncdf4,quietly = TRUE,warn.conflicts=FALSE)
 library(sf,quietly = TRUE,warn.conflicts=FALSE)
 library(dplyr, quietly = TRUE,warn.conflicts=FALSE)
 library(sp,quietly = TRUE,warn.conflicts=FALSE)
-
+library(strucchange)
+library(mmand)
 
 LongLatToUTM<-function(x,y,zone){
   xy <- data.frame(ID = 1:length(x), X = x, Y = y)
@@ -39,6 +40,35 @@ LongLatToUTM<-function(x,y,zone){
 }
 
 
+otsu <- function(x, range = c(0, 1), levels = 256){
+
+  
+  levels = as.integer(levels)
+  if ( is.na(levels) || levels < 1 ) stop("Levels must be at least equal 1.")
+  breaks = seq(range[1], range[2], length.out = levels+1)
+  if (!is.double(x)){ storage.mode(x) = 'double'}   # converts logical to numeric
+  
+# prepare 3D array for the 'apply' function
+  dim(x) = c(dim(x)[seq_len(2)], 1)
+  
+# threshold each frame separately
+  apply(x, 3, function(y) {
+    h = hist.default(y, breaks = breaks, plot = FALSE)
+    counts = as.double(h$counts)
+    mids = as.double(h$mids)
+    len = length(counts)
+    w1 = cumsum(counts)
+    w2 = w1[len] + counts - w1
+    cm = counts * mids
+    m1 = cumsum(cm)
+    m2 = m1[len] + cm - m1
+    var = w1 * w2 * (m2/w2 - m1/w1)^2
+    # find the left- and right-most maximum and return the threshold value in between
+    maxi = which(var == max(var, na.rm = TRUE))
+    (mids[maxi[1]] + mids[maxi[length(maxi)]] ) /2
+  })
+}
+   
 
 
 #--------------------------------
@@ -56,7 +86,7 @@ node_index= which(nodeids %in% this_river_node_ids)
 cl_reach_ids= ncvar_get(SWORD_in, 'centerlines/reach_id',verbose=FALSE)
 cl_index=which(cl_reach_ids %in% this_river_reach_ids)
     
-print(this_river_reach_ids)
+#print(this_river_reach_ids)
 
 cl_x=ncvar_get(SWORD_in, 'centerlines/x',verbose=FALSE)[cl_index]
 cl_y=ncvar_get(SWORD_in, 'centerlines/y',verbose=FALSE)[cl_index]
@@ -68,6 +98,7 @@ cl_df=data.frame(reach_id=cl_reach_ids[cl_index],lon=cl_x,lat=cl_y,cl_id=cl_id,n
 
 cl_df=st_as_sf(cl_df,coords=c('lon','lat'),remove=FALSE, crs='+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
 
+   # print(cl_df)
 
 cl_df=cl_df%>%
   mutate(cl_UTM_x=LongLatToUTM(cl_df$lon,cl_df$lat,utm_zone)[,1])%>%
@@ -104,7 +135,7 @@ node_cls=node_df%>%
   group_by(node_id)%>%
   filter(cl_id == min(cl_id) | cl_id == max(cl_id)) %>%
   mutate(node_angle= atan((cl_UTM_y[cl_id == min(cl_id)]-cl_UTM_y[cl_id == max(cl_id)])/(cl_UTM_x[cl_id == min(cl_id)]-cl_UTM_x[cl_id == max(cl_id)])))%>%
-  select(-geometry)%>%
+  dplyr::select(-geometry)%>%
   #make a polygon geometry- 4 points, with the first point repeated for 5 total points
   mutate(point1_x=  cl_UTM_x[cl_id == min(cl_id)] -cos(node_angle-(90*pi/180))*node_wmax*scale_maxwidth, 
          point1_y=  cl_UTM_y[cl_id == min(cl_id)] +sin(node_angle-(90*pi/180))*node_wmax*scale_maxwidth,
@@ -201,7 +232,9 @@ classify_water=function(Inputimagefile,spatial_object,
                         water_index_threshold){
     
     #print(Inputimagefile)
+band1 =raster(Inputimagefile,band=1)
 band2 = raster(Inputimagefile,band=2)
+band3= raster(Inputimagefile,band=3)
 band4 = raster(Inputimagefile,band=4)
 
 # xmin_col=colFromX(band2,extent(spatial_node_df)@xmin)
@@ -212,15 +245,53 @@ band4 = raster(Inputimagefile,band=4)
 
 band2_raster=crop(band2,spatial_object)
 band4_raster=crop(band4,spatial_object)
+band1_raster=crop(band1,spatial_object)
+band3_raster=crop(band3,spatial_object)
 
-ndwi = (band2_raster - band4_raster)/(band2_raster + band4_raster) 
-
-#ndwi=mask(ndwi,spatial_object)
+NDWI = (band2_raster - band4_raster)/(band2_raster + band4_raster) 
+  
+  #first, otsu threshold the NDWI
+  otsu_level=otsu(as.matrix(NDWI),range=c(cellStats(NDWI,min),cellStats(NDWI,max)),levels=65255)
+  otsu_water=NDWI>otsu_level
     
-ndwi[ndwi[] >= water_index_threshold] = 1 # water pixel
-ndwi[ndwi[] < water_index_threshold] = 0 # non-water pixel
 
-labelled_ndwi=clump(ndwi)
+  #then, dilate this thresholded image
+  step_one=dilate(as.matrix(otsu_water),kernel=matrix(1L,nrow=11,ncol=11))
+  step_two=step_one*as.matrix(NDWI)
+  # if (     all(is.na(step_two[step_two>0]) )     ){
+  #   width_water=NaN
+  #   names(width_water)='too small'
+  #   return(width_water)
+  # }
+    #plot(step_two)
+    
+  
+    
+  
+  #now, recalculate the histogram for what is in the buffer, dropping values less than 0
+  buffered_hist=hist(as.matrix(step_two[step_two>0]),breaks=100)$density
+  
+  buffered_hist_vals=hist(as.matrix(step_two[step_two>0]),breaks=100)$breaks
+  buffered_hist_ts <- ts(buffered_hist) #save as a time series so we can use handy function below
+  
+  #calculate natural breaks in function
+  structured_breaks=strucchange::breakpoints(buffered_hist_ts~1)
+  breakpoints=buffered_hist_vals[structured_breaks$breakpoints]
+  
+  #following Cooley et al, theory would be that we want the last two breakpoints to define LL (2nd to last) and WL (last)
+  if (length(breakpoints)>1){
+  LL=breakpoints[length(breakpoints)-1]
+  WL=breakpoints[length(breakpoints)]
+  
+  water_fraction= 100*(step_two - LL) / (WL-LL)
+  binary_water=raster(water_fraction>WL)
+  }else{
+    binary_water=raster(step_two>breakpoints[1])
+  }
+  
+
+
+labelled_ndwi=clump(binary_water)
 #select the largest
 label_counts=data.frame(raster::freq(labelled_ndwi))%>%
     filter(value!= 'NA')%>%
@@ -243,7 +314,11 @@ y_size=res(labelled_ndwi)[2]
 
 water_area= total_cells*x_size*y_size
 
-
+   # plotRGB(raster::brick(band1_raster,band2_raster,band3_raster))
+   # plot(NDWI)
+   # plot(otsu_water)
+   # plot(binary_water)
+   # plot(labelled_ndwi)
 
 output=data.frame(node_id=this_river_node_ids,reach_id=this_river_reach_ids,water_area_m2=water_area,
                      image_name=image_name,datetime=datetime)

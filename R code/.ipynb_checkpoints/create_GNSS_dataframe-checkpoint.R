@@ -1,0 +1,72 @@
+create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_directory){
+  library(ncdf4)
+  library(stringr)
+  library(dplyr)
+  
+  
+  gnss_nc=nc_open(paste0(gnss_drift_data_directory,log_file,'.nc'))
+  # variables we need
+  # wse- water surface height wrt geoid. All JPL corrections applied
+  # longitude- longitude
+  # latitude- latitute
+  # time_tai - time in some wierd TAI format. It is seconds since January 1 2000 at midnight WITHOUT leap seconds.
+  #motion flag- 0,1, or 2. COdes 0 and 1 incidate no good data, keep only 2
+  #surface type flag - 10, 11, or 12. Simialrly, only code 12 incicates quality data
+  
+  
+  Lat=ncvar_get(gnss_nc,'latitude')
+  Lon=ncvar_get(gnss_nc,'longitude')
+  gnss_wse= ncvar_get(gnss_nc,'wse')
+  gnss_time_tai=ncvar_get(gnss_nc,'time_tai')
+  gnss_motion_flag  =ncvar_get(gnss_nc,'motioncode_flag')
+  gnss_surf_flag  =ncvar_get(gnss_nc,'surfacetype_flag')
+  gnss_ellipsoid= paste(ncatt_get(gnss_nc,0,'ellipsoid_semi_major_axis')$value,ncatt_get(gnss_nc,0,'ellipsoid_flattening')$value,sep=",")
+  gnss_uncertainty=ncvar_get(gnss_nc,'position_3drss_formal_error')
+  
+  Info_event=ncvar_get(gnss_nc,'infoEventDescription')
+  Info_event_start=ncvar_get(gnss_nc,'infoEventStartTime')
+  Info_event_end=ncvar_get(gnss_nc,'infoEventEndTime')
+  
+
+  
+  Info_df=data.frame(Event_code=Info_event, Event_start= Info_event_start, Event_end=Info_event_end)%>%
+    mutate(Event_start_UTC = as.POSIXct(Event_start,origin='2000-01-01 00:00:00',tz='UTC'))%>%
+    mutate(Event_end_UTC = as.POSIXct(Event_end,origin='2000-01-01 00:00:00',tz='UTC' ))%>%
+    select(-Event_end,-Event_start)%>%
+    #add 2 minutes to the event codes
+     mutate(Event_start_UTC=Event_start_UTC-1*60)%>%
+     mutate(Event_end_UTC=Event_end_UTC+1*60)%>%
+    filter(Event_code=='Bridge' | Event_code == 'Powerlines' )
+  
+  
+  
+  gnss_log=data.frame(gnss_Lat=Lat,gnss_Lon=Lon,gnss_wse=gnss_wse,gnss_time_tai=gnss_time_tai,gnss_uncertainty_m=gnss_uncertainty,
+                      gnss_surf_flag=gnss_surf_flag,gnss_motion_flag=gnss_motion_flag)%>%
+    #R's native POSIXCT also doesn't have leap seconds, so we're good
+    mutate(gnss_time_UTC = as.POSIXct(gnss_time_tai,origin='2000-01-01 00:00:00',tz='UTC' ))%>%
+    #need this to join, but let's presrve original
+    filter(gnss_surf_flag==12)%>%
+    filter(gnss_motion_flag==2)%>%
+    mutate(gnss_ellipsoid=gnss_ellipsoid)%>%
+    #filter for self ID uncertainty at 5cm
+    filter(gnss_uncertainty_m<0.05)%>%
+    mutate(drift_id= sub('',"",log_file))
+  
+  #need to recurse this, so a for loop is actually needed!
+  for(i in 1:nrow(Info_df)){
+    gnss_log=filter(gnss_log, gnss_time_UTC >= Info_df$Event_end_UTC[i] | gnss_time_UTC <= Info_df$Event_start_UTC[i] )
+    
+  }
+  
+  if (nrow(gnss_log)==0){
+    print(paste('filename',log_file,'bonked'))
+    return(NA)
+  }
+  
+  plot(gnss_log$gnss_time_UTC,gnss_log$gnss_wse)
+  
+  nc_close(gnss_nc)
+  
+  print(paste0(output_directory,log_file,'.csv'))
+  
+  write.csv(gnss_log,paste0(output_directory,log_file,'.csv'))}
