@@ -45,6 +45,7 @@ node_nodeid=nodeids[node_index]
 node_df=data.frame(lon=node_x,lat=node_y,node_id=node_nodeid,node_wmax=node_max_width,
                    node_length=node_length,reach_id=node_reachid)
 
+   # print(node_df)
 
 node_df= node_df%>%
   mutate(node_UTM_x=LongLatToUTM(node_df$lon,node_df$lat,utm_zone)[,1])%>%

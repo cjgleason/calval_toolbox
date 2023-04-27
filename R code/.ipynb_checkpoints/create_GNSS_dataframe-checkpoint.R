@@ -33,9 +33,9 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
     mutate(Event_start_UTC = as.POSIXct(Event_start,origin='2000-01-01 00:00:00',tz='UTC'))%>%
     mutate(Event_end_UTC = as.POSIXct(Event_end,origin='2000-01-01 00:00:00',tz='UTC' ))%>%
     select(-Event_end,-Event_start)%>%
-    #add 2 minutes to the event codes
-     mutate(Event_start_UTC=Event_start_UTC-1*60)%>%
-     mutate(Event_end_UTC=Event_end_UTC+1*60)%>%
+    #add 1 minutes to the event codes
+    mutate(Event_start_UTC=Event_start_UTC-1*60)%>%
+    mutate(Event_end_UTC=Event_end_UTC+1*60)%>%
     filter(Event_code=='Bridge' | Event_code == 'Powerlines' )
   
   
@@ -44,7 +44,7 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
                       gnss_surf_flag=gnss_surf_flag,gnss_motion_flag=gnss_motion_flag)%>%
     #R's native POSIXCT also doesn't have leap seconds, so we're good
     mutate(gnss_time_UTC = as.POSIXct(gnss_time_tai,origin='2000-01-01 00:00:00',tz='UTC' ))%>%
-    #need this to join, but let's presrve original
+    #need this to join, but let's preserve original
     filter(gnss_surf_flag==12)%>%
     filter(gnss_motion_flag==2)%>%
     mutate(gnss_ellipsoid=gnss_ellipsoid)%>%
@@ -53,10 +53,12 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
     mutate(drift_id= sub('',"",log_file))
   
   #need to recurse this, so a for loop is actually needed!
+if (nrow(Info_df)>0){
   for(i in 1:nrow(Info_df)){
     gnss_log=filter(gnss_log, gnss_time_UTC >= Info_df$Event_end_UTC[i] | gnss_time_UTC <= Info_df$Event_start_UTC[i] )
     
   }
+}
   
   if (nrow(gnss_log)==0){
     print(paste('filename',log_file,'bonked'))
