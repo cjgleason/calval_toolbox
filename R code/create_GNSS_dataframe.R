@@ -36,7 +36,9 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
     #add 1 minutes to the event codes
     mutate(Event_start_UTC=Event_start_UTC-1*60)%>%
     mutate(Event_end_UTC=Event_end_UTC+1*60)%>%
-    filter(Event_code=='Bridge' | Event_code == 'Powerlines' )
+    filter(Event_code=='Bridge' | Event_code == 'Powerlines' | Event_code=='bridge' |
+           Event_code=='Bridges' |Event_code=='bridges'| Event_code == 'Powerline'|
+           Event_code == 'powerlines' | Event_code == 'powerline' | Event_code == 'Birdge')
   
   
   
