@@ -1,5 +1,5 @@
 calculate_slope_wse_fromdrift=function(SWORD_path,drift_directory,PT_directory,output_directory,this_river_reach_ids,this_river_node_ids,
-                                       utm_zone, buffer,rivername, photo_path=NULL){
+                                       utm_zone, buffer,rivername, photo_path=NULL, reprocess_switch){
   
   library(sf)
   library(dplyr)
@@ -15,7 +15,6 @@ LongLatToUTM<-function(x,y,zone){
   res=st_as_sf(res)
   return(data.frame(x=st_coordinates(res)[,1],y=st_coordinates(res)[,2]))
 }
-
 
 #get SWORD data---------------------------------------
 SWORD_in=nc_open(SWORD_path,verbose=FALSE)
@@ -398,7 +397,23 @@ calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river
 #------------------------------------------------------
 
 
-drifts = paste0(drift_directory,list.files(drift_directory))
+
+if(reprocess_switch ==0){
+    existing_node_df=read.csv(paste0(output_directory,'node/',rivername,'_drift_node_wses.csv'))
+    existing_reach_df=read.csv(paste0(output_directory,'reach/',rivername,'_drift_reach_wse_slope.csv'))
+    
+    potential_drifts=setdiff(sub( "\\..*","", list.files(drift_directory)),unique(existing_node_df$drift_id))
+
+    #if there is nothing new, proceed to chuck it out
+    if(identical(potential_drifts,character(0))){return(NA)}
+    drifts=paste0(drift_directory,potential_drifts,'.csv') #we scrubbed the .csv when we pulled them for a check
+    
+} else {
+    drifts = paste0(drift_directory,list.files(drift_directory))
+}
+  
+    
+
 
 node_wses=do.call(rbind,lapply(drifts,calc_node_wse,node_df=node_df,cl_df=cl_df,zone=utm_zone,photo_path=photo_path))%>%
   mutate(node_id=format(node_id,scientific=FALSE))%>%
@@ -424,9 +439,16 @@ reach_stats=do.call(rbind,lapply(drifts,calc_reach_stats,spatial_reach=spatial_r
   transmute(reach_id=reach_id,mean_reach_drift_wse_m=wse_bar,mean_reach_drift_wse_precision_m=wse_precision,wse_drift_start_UTC=wse_start,
             wse_drift_end_UTC=wse_end, reach_drift_slope_m_m=slope,reach_drift_slope_precision_m=slope_precision,drift_id=drift_id)
 
-write.csv(node_geom,paste0(output_directory,'node/',rivername,'_drift_node_geom.csv'))
-write.csv(reach_geom,paste0(output_directory,'reach/',rivername,'_drift_reach_geom.csv'))
-write.csv(node_wses,paste0(output_directory,'node/',rivername,'_drift_node_wses.csv'))
-write.csv(reach_stats,paste0(output_directory,'reach/',rivername,'_drift_reach_wse_slope.csv'))
+    if(reprocess_switch ==1){
+write.csv(node_geom,paste0(output_directory,'node/',rivername,'_drift_node_geom.csv'),append=FALSE,row.names=FALSE)
+write.csv(reach_geom,paste0(output_directory,'reach/',rivername,'_drift_reach_geom.csv'),append=FALSE,row.names=FALSE)
+write.csv(node_wses,paste0(output_directory,'node/',rivername,'_drift_node_wses.csv'),append=FALSE,row.names=FALSE)
+write.csv(reach_stats,paste0(output_directory,'reach/',rivername,'_drift_reach_wse_slope.csv'),append=FALSE,row.names=FALSE)} else {
+        
+write.csv(node_geom,paste0(output_directory,'node/',rivername,'_drift_node_geom.csv'),append=TRUE,row.names=FALSE)
+write.csv(reach_geom,paste0(output_directory,'reach/',rivername,'_drift_reach_geom.csv'),append=TRUE,row.names=FALSE)
+write.csv(node_wses,paste0(output_directory,'node/',rivername,'_drift_node_wses.csv'),append=TRUE,row.names=FALSE)
+write.csv(reach_stats,paste0(output_directory,'reach/',rivername,'_drift_reach_wse_slope.csv'),append=TRUE,row.names=FALSE)}
 
  }
+

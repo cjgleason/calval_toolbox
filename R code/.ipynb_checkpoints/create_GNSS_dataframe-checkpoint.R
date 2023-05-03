@@ -3,14 +3,14 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
   library(stringr)
   library(dplyr)
   
-  
+
   gnss_nc=nc_open(paste0(gnss_drift_data_directory,log_file,'.nc'))
   # variables we need
   # wse- water surface height wrt geoid. All JPL corrections applied
   # longitude- longitude
   # latitude- latitute
   # time_tai - time in some wierd TAI format. It is seconds since January 1 2000 at midnight WITHOUT leap seconds.
-  #motion flag- 0,1, or 2. COdes 0 and 1 incidate no good data, keep only 2
+  #motion flag- 0,1, or 2. Codes 0 and 1 incidate no good data, keep only 2
   #surface type flag - 10, 11, or 12. Simialrly, only code 12 incicates quality data
   
   
@@ -73,4 +73,9 @@ if (nrow(Info_df)>0){
   
   print(paste0(output_directory,log_file,'.csv'))
   
-  write.csv(gnss_log,paste0(output_directory,log_file,'.csv'))}
+  write.csv(gnss_log,paste0(output_directory,log_file,'.csv'))
+
+
+
+
+}
