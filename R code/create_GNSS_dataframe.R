@@ -22,6 +22,7 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
   gnss_surf_flag  =ncvar_get(gnss_nc,'surfacetype_flag')
   gnss_ellipsoid= paste(ncatt_get(gnss_nc,0,'ellipsoid_semi_major_axis')$value,ncatt_get(gnss_nc,0,'ellipsoid_flattening')$value,sep=",")
   gnss_uncertainty=ncvar_get(gnss_nc,'position_3drss_formal_error')
+  height_above_ellipsoid=ncvar_get(gnss_nc,'height_water')
   
   Info_event=ncvar_get(gnss_nc,'infoEventDescription')
   Info_event_start=ncvar_get(gnss_nc,'infoEventStartTime')
@@ -43,7 +44,7 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
   
   
   gnss_log=data.frame(gnss_Lat=Lat,gnss_Lon=Lon,gnss_wse=gnss_wse,gnss_time_tai=gnss_time_tai,gnss_uncertainty_m=gnss_uncertainty,
-                      gnss_surf_flag=gnss_surf_flag,gnss_motion_flag=gnss_motion_flag)%>%
+                      gnss_surf_flag=gnss_surf_flag,gnss_motion_flag=gnss_motion_flag, height_above_ellipsoid= height_above_ellipsoid)%>%
     #R's native POSIXCT also doesn't have leap seconds, so we're good
     mutate(gnss_time_UTC = as.POSIXct(gnss_time_tai,origin='2000-01-01 00:00:00',tz='UTC' ))%>%
     #need this to join, but let's preserve original
