@@ -1,16 +1,138 @@
-correct_pt_to_gnss= function(raw_pt_file,pt_key_file,dist_thresh,time_thresh,pt_data_directory,
-                             gnss_drift_data_directory,QA_QC_pt_output_directory, flagged_pt_output_directory,
-                             gnss_sd_thresh,offset_sd_thresh,change_thresh_15_min){
 library(dplyr)
+library(parallel)
 library(stringr)
 library(tidyr)
 library(fuzzyjoin)
 library(geodist)
 library(bayesbio)
 library(ncdf4)
+
+
+reprocess_switch=0 #0 or 1. 1 means to recreate all reach and node products following some change in processing. 
+#0 means to just append to existing dataframes
+
+# hubname='UNC'
+# rivername='WK'
+# continent='oc'
+# PT_key_file= 'WK_Key_20230331.csv' #WK
+# utm_zone='58 +south'#WK='58 +south'
+
+# hubname='UMass'
+# rivername='CR'
+# continent='na'
+# PT_key_file='Key_CR_FS_20230322.csv' #CT
+# utm_zone=18 #Ct= 18
+
+hubname='CU'
+rivername='WM'
+continent='na'
+PT_key_file= 'SWOTCalVal_WM_KEY_20230326_20230509.csv' #WM
+utm_zone=10 #WM= 10
+
+
+buffer=500 #m, 'extends' the reach
+
+setwd(paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/'))
+domain_file=keyfile=paste0(rivername,'_domain.csv')
+
+#PT paths---------
+PT_data_directory='Raw PT/'
+QA_QC_PT_output_directory='Munged PT/'
+flagged_PT_output_directory='Flagged PT/'
+#--------------------------------------------------
+
+#drift paths------------------------------------------
+GNSS_drift_data_directory=paste0('From Andy/',hubname,'_netCDFs/')
+if(reprocess_switch==1){
+  
+  drift_string= paste0('Munged drifts/','reprocessed_',  str_replace_all(as.character(Sys.Date()),'\\-','_'))
+  reachnode_string= paste0('Data frames/','reprocessed_',  str_replace_all(as.character(Sys.Date()),'\\-','_'))
+  node_string =paste0('Data frames/','reprocessed_',  str_replace_all(as.character(Sys.Date()),'\\-','_'),'/node')
+  reach_string=paste0('Data frames/','reprocessed_',  str_replace_all(as.character(Sys.Date()),'\\-','_'),'/reach')
+  
+  #check if we've already reprocessed today
+  if (dir.exists(drift_string)){
+    #if we have, then use that as the output and clear the files in the drift directory
+    unlink(drift_string, recursive = TRUE)
+    dir.create(drift_string)
+    QA_QC_drift_output_directory=paste0(drift_string,'/')
+    reachnode_output_directory=paste0(reachnode_string,'/')
+  } else {
+    #if we haven't reprocessed today
+    dir.create(drift_string)
+    dir.create(reachnode_string)
+    dir.create(node_string)
+    dir.create(reach_string)
     
-    filename=raw_pt_file
+    QA_QC_drift_output_directory=paste0(drift_string,'/')
+    reachnode_output_directory=paste0(reachnode_string,'/')
+  }
+  
+} else { #we aren't reprocessing. find the most recent folders to use
+  
+  folderlist= list.files('Munged drifts',full.names = TRUE)
+  
+  foldertimes=file.info(folderlist)%>%
+    mutate(mintime= Sys.time()-mtime) %>%
+    filter(mintime== min(mintime)) 
+  
+  QA_QC_drift_output_directory=paste0(row.names(foldertimes),'/')  
+  folderlist2= list.files('Data frames',full.names = TRUE)
+  
+  foldertimes2=file.info(folderlist2)%>%
+    mutate(mintime= Sys.time()-mtime) %>%
+    filter(mintime== min(mintime)) 
+  
+  reachnode_output_directory=row.names(foldertimes2)
+  
+}
+
+flagged_drift_output_directory='Flagged drifts/'
+#--------------------------------------------------
+
+#sword paths----------------------------------------
+SWORD_path=paste0('/nas/cee-water/cjgleason/calval/SWORD_15/netcdf/',continent,
+                  '_sword_v15.nc')
+munged_drift_directory='Munged drifts/'
+PT_directory='Munged PTs/'
+#------------------------------
+
+
+
+#munge PTs if needed------
+dist_thresh=150 # 150m
+time_thresh= 15*60 #minutes as seconds, centered, so 15 =30 mins total time
+GNSS_sd_thresh=0.15 # 15cm how much variance do you want in the GNSS data when it is within the distance threshold?
+offset_sd_thresh=0.10 #m, so 10cm. the the PT apparantly shift by more than a cm?
+change_thresh_15_min=0.05#m- does it change more than 5cm in 15 minutes? that is a discontinuity in offset
+
+#check for un-munged PT data
+#pull filename before the .csv
+raw_PT=sub( "\\..*","", list.files(PT_data_directory))
+#pull filename before the second _
+QA_QC_PTs=sub( "\\..*","",list.files(QA_QC_PT_output_directory))
+flagged_PTs=sub( "\\..*","",list.files(flagged_PT_output_directory))
+#what raw PT data have not been munged
+unmunged_PTs=setdiff(raw_PT,c(flagged_PTs,QA_QC_PTs))
+#run the PTs that are not yet munged
+
+
+
+
+  
+raw_pt_file='SWOTCalVal_WM_PT_L1_PT100_20230328T140000_20230509T174500_20230510T112409'
+                           pt_key_file=PT_key_file
+                           dist_thresh=dist_thresh
+                           time_thresh=time_thresh
+                           pt_data_directory=PT_data_directory
+                           gnss_drift_data_directory=QA_QC_drift_output_directory
+                           QA_QC_pt_output_directory=QA_QC_PT_output_directory
+                           flagged_pt_output_directory=flagged_PT_output_directory
+                           gnss_sd_thresh=GNSS_sd_thresh
+                           offset_sd_thresh=offset_sd_thresh
+                           change_thresh_15_min=change_thresh_15_min
     
+  
   handle_raw_pt=function(raw_pt_file,pt_key_file,pt_data_directory,gnss_drift_data_directory){
     #read in raw pt--------------
     #ID could come from the filename, right now it is reading the serial number from the file
@@ -21,7 +143,7 @@ library(ncdf4)
     #11 lines of headers to skip to deal with read in function
     
     #!!!!!!!!!!!!!!
-    #The willamette epxeriment data have a missing header, so we skip the 12th line and assign our own header. Deadly !
+    #The willamette data have a missing header, so we skip the 12th line and assign our own header. Deadly !
     #!!!!!!!!!!!!!
     pt_data=read.csv(paste0(pt_data_directory,raw_pt_file,'.csv'),skip=11,header=TRUE) %>%
       mutate(pt_serial=pt_serial)
@@ -54,8 +176,8 @@ library(ncdf4)
   correct_pt=function(prepped_pt,dist_thresh,time_thresh,gnss_drift_data_directory){
     
     
-     log_files=rbind( unique(prepped_pt$driftID_install),unique(prepped_pt$driftID_uninstall)) #need both files to work on
-    #log_files=unique(prepped_pt$driftID_install)
+    # log_files=rbind( unique(prepped_pt$driftID_install),unique(prepped_pt$driftID_uninstall)) #the second from the join.
+    log_files=unique(prepped_pt$driftID_install)
     log_files=log_files[!is.na(log_files)]
     # print(log_files)
     
@@ -195,33 +317,34 @@ library(ncdf4)
   #now check the offset for a few things that we care about. We're checking only the pt corrections we've made
   
   #1- are the gnss data too noisy?
-    #need to group by date- overall noise is not a problem, noise within date is a problem
-    
-    noise_calc = offset_pt %>%
-    mutate(date= as.Date(gnss_time_UTC))%>%
-    group_by(date)%>%
-    summarize(variances=sd(gnss_wse))
-    
-  if(any(noise_calc$variances >gnss_sd_thresh  )){
+  if(sd(offset_pt$gnss_wse)>gnss_sd_thresh  ){
     print(filename)
-    print('put in, pull out, or both too noisy within spatial window')
-    output='put in, pull out, or both too noisy within spatial window'
+    print('gnss range too large, check thresholds or data')
+    output='gnss range too large, check thresholds or data'
     offset_pt=mutate(offset_pt,error=output)
-  write.csv(offset_pt,file=paste0(flagged_pt_output_directory,filename,'.csv'), row.names=FALSE)
+    saveRDS(offset_pt,file=paste0(flagged_pt_output_directory,filename,'_',offset_pt$pt_serial[1],'.rds'))
     return(NA)
   }
   
   #2- are the pt data too noisy?
-    #look at the offset over time- it should have a low variance
-  if(sd(offset_pt$pt_correction) >offset_sd_thresh  ){
+  if(sd(offset_pt$pt_correction_sd) >offset_sd_thresh  ){
     print(filename)
     print('correction too noisy, check thresholds or data')
     output='correction too noisy, check thresholds or data'
     offset_pt=mutate(offset_pt,error=output)
-    write.csv(offset_pt,file=paste0(flagged_pt_output_directory,filename,'.csv'), row.names=FALSE)
+    saveRDS(offset_pt,file=paste0(flagged_pt_output_directory,filename,'_',offset_pt$pt_serial[1],'.rds'))
     return(NA)
   }
-
+  
+  #3 -are the offsets changing too much in time?
+  if(sd(offset_pt$pt_correction) >change_thresh_15_min  ){
+    print(filename)
+    print('offsets are too different over time, check thresholds or data')
+    output='offsets are too different over time, check thresholds or data'
+    offset_pt=mutate(offset_pt,error=output)
+    saveRDS(offset_pt,file=paste0(flagged_pt_output_directory,filename,'_',offset_pt$pt_serial[1],'.rds'))
+    return(NA)
+  }
   
   
   #if those pass, we're good! now, we need to apply the offsets to the rest of the pt data
@@ -266,10 +389,13 @@ library(ncdf4)
   
   print(filename)
   print('this file passed all checks')
-  write.csv(final_pt,file=paste0(QA_QC_pt_output_directory,filename,'.csv'),row.names=FALSE)
+  write.csv(final_pt,file=paste0(QA_QC_pt_output_directory,filename,'.csv'))
   
   
-}#end function 
+  
+  
+
+
 
 
 
