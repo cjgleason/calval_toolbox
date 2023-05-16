@@ -26,6 +26,8 @@ select_appropriate_drift=function(passname,time_threshold_sec,wse_threshold_m,di
   drift_nodes= read.csv(drift_node_file)%>%
     mutate(time=as.numeric(as.POSIXct(time_UTC)))%>% #beacuse it is a .csv and not .rds, it loses its datetime
     mutate(time_diff_to_swot_drift_sec=abs(time-swot_time_UTC))
+    
+
   
   keep_index= which(drift_nodes$time_diff_to_swot_drift_sec<=time_threshold_sec)
   remove_index =which(drift_nodes$time_diff_to_swot_drift_sec>time_threshold_sec)
@@ -63,7 +65,16 @@ select_appropriate_drift=function(passname,time_threshold_sec,wse_threshold_m,di
     filter(time_diff_to_swot_pt_sec==min(time_diff_to_swot_pt_sec))%>%
     ungroup()%>%
     select(-driftID_install,-driftID_uninstall)%>%#this was the drift used to correct it, but that is confusing here
-    mutate(Lat=pt_lat,Lon=pt_lon) #for joining
+    mutate(Lat=pt_lat,Lon=pt_lon) %>%
+    filter(time_diff_to_swot_pt_sec<=time_threshold_sec)
+    
+    
+    if(nrow(pt_at_swot_time)==0){
+    write.csv('there are no appropriate drifts for this pass',paste0(matched_output_directory,passname,'p',
+                                        str_replace_all(as.character(Sys.Date()),'\\-','_'),'_',rivername,'.csv'),row.names=FALSE)
+    
+        return(NA)
+    }
   
   #compare drift node levels with pt levels
   #do a difference join based lat/lon. Slow.

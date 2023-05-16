@@ -10,20 +10,26 @@ library(bayesbio)
 library(ncdf4)
     
     filename=raw_pt_file
+  
+filename=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/')[[1]])])
     
   handle_raw_pt=function(raw_pt_file,pt_key_file,pt_data_directory,gnss_drift_data_directory){
     #read in raw pt--------------
     #ID could come from the filename, right now it is reading the serial number from the file
     
     #kluge that quickly gets what we want by reading in the csv flat and pulling the first entry
-    pt_serial = strtoi(as.character(read.csv(paste0(pt_data_directory,raw_pt_file,'.csv'))$Serial_number.[1]))
+      
     
+    pt_serial = strtoi(read.csv(raw_pt_file)$Serial_number.[1])
+      
+  
+                   
     #11 lines of headers to skip to deal with read in function
     
     #!!!!!!!!!!!!!!
     #The willamette epxeriment data have a missing header, so we skip the 12th line and assign our own header. Deadly !
     #!!!!!!!!!!!!!
-    pt_data=read.csv(paste0(pt_data_directory,raw_pt_file,'.csv'),skip=11,header=TRUE) %>%
+    pt_data=read.csv(raw_pt_file,skip=11,header=TRUE) %>%
       mutate(pt_serial=pt_serial)
     
     

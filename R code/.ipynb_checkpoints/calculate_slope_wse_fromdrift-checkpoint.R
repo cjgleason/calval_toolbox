@@ -444,15 +444,15 @@ reach_stats=do.call(rbind,lapply(drifts,calc_reach_stats,spatial_reach=spatial_r
             wse_drift_end_UTC=wse_end, reach_drift_slope_m_m=slope,reach_drift_slope_precision_m=slope_precision,drift_id=drift_id,ellipsoid_height_m=ellipsoid_height)
 
     if(reprocess_switch ==1){
-write.csv(node_geom,paste0(output_directory,'node/',rivername,'_drift_node_geom.csv'),append=FALSE,row.names=FALSE)
-write.csv(reach_geom,paste0(output_directory,'reach/',rivername,'_drift_reach_geom.csv'),append=FALSE,row.names=FALSE)
-write.csv(node_wses,paste0(output_directory,'node/',rivername,'_drift_node_wses.csv'),append=FALSE,row.names=FALSE)
-write.csv(reach_stats,paste0(output_directory,'reach/',rivername,'_drift_reach_wse_slope.csv'),append=FALSE,row.names=FALSE)} else {
+write.csv(node_geom,paste0(output_directory,'/node/',rivername,'_drift_node_geom.csv'),append=FALSE,row.names=FALSE)
+write.csv(reach_geom,paste0(output_directory,'/reach/',rivername,'_drift_reach_geom.csv'),append=FALSE,row.names=FALSE)
+write.csv(node_wses,paste0(output_directory,'/node/',rivername,'_drift_node_wses.csv'),append=FALSE,row.names=FALSE)
+write.csv(reach_stats,paste0(output_directory,'/reach/',rivername,'_drift_reach_wse_slope.csv'),append=FALSE,row.names=FALSE)} else {
         
-write.csv(node_geom,paste0(output_directory,'node/',rivername,'_drift_node_geom.csv'),append=TRUE,row.names=FALSE)
-write.csv(reach_geom,paste0(output_directory,'reach/',rivername,'_drift_reach_geom.csv'),append=TRUE,row.names=FALSE)
-write.csv(node_wses,paste0(output_directory,'node/',rivername,'_drift_node_wses.csv'),append=TRUE,row.names=FALSE)
-write.csv(reach_stats,paste0(output_directory,'reach/',rivername,'_drift_reach_wse_slope.csv'),append=TRUE,row.names=FALSE)}
+write.csv(node_geom,paste0(output_directory,'/node/',rivername,'_drift_node_geom.csv'),append=TRUE,row.names=FALSE)
+write.csv(reach_geom,paste0(output_directory,'/reach/',rivername,'_drift_reach_geom.csv'),append=TRUE,row.names=FALSE)
+write.csv(node_wses,paste0(output_directory,'/node/',rivername,'_drift_node_wses.csv'),append=TRUE,row.names=FALSE)
+write.csv(reach_stats,paste0(output_directory,'/reach/',rivername,'_drift_reach_wse_slope.csv'),append=TRUE,row.names=FALSE)}
 
  }
 
