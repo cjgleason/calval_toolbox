@@ -6,19 +6,14 @@
 #utm_zone (based on imagery)
 
 
-calculate_area_from_imagery=function(input_list,
-                                     image_list,
+calculate_area_from_imagery=function(image,
+                                     this_river_reach_ids,
+                                     this_river_node_ids,
+                                     rivercode,
                                      utm_zone,
-                                     datetime,
                                      scale_maxwidth, 
-                                     SWORD_path,
-                                     water_index_threshold,
-                                     dir_output){
+                                     SWORD_path){
 
-#print(input_list)
-    this_river_reach_ids=input_list$reach
-    this_river_node_ids=input_list$node
-    reach_or_node=input_list$reach_or_node
 
 # load library 
 library(raster,quietly = TRUE,warn.conflicts=FALSE)
@@ -27,8 +22,7 @@ library(ncdf4,quietly = TRUE,warn.conflicts=FALSE)
 library(sf,quietly = TRUE,warn.conflicts=FALSE)
 library(dplyr, quietly = TRUE,warn.conflicts=FALSE)
 library(sp,quietly = TRUE,warn.conflicts=FALSE)
-library(strucchange)
-library(mmand)
+
 
 LongLatToUTM<-function(x,y,zone){
   xy <- data.frame(ID = 1:length(x), X = x, Y = y)
@@ -38,37 +32,6 @@ LongLatToUTM<-function(x,y,zone){
   res=st_as_sf(res)
   return(data.frame(x=st_coordinates(res)[,1],y=st_coordinates(res)[,2]))
 }
-
-
-otsu <- function(x, range = c(0, 1), levels = 256){
-
-  
-  levels = as.integer(levels)
-  if ( is.na(levels) || levels < 1 ) stop("Levels must be at least equal 1.")
-  breaks = seq(range[1], range[2], length.out = levels+1)
-  if (!is.double(x)){ storage.mode(x) = 'double'}   # converts logical to numeric
-  
-# prepare 3D array for the 'apply' function
-  dim(x) = c(dim(x)[seq_len(2)], 1)
-  
-# threshold each frame separately
-  apply(x, 3, function(y) {
-    h = hist.default(y, breaks = breaks, plot = FALSE)
-    counts = as.double(h$counts)
-    mids = as.double(h$mids)
-    len = length(counts)
-    w1 = cumsum(counts)
-    w2 = w1[len] + counts - w1
-    cm = counts * mids
-    m1 = cumsum(cm)
-    m2 = m1[len] + cm - m1
-    var = w1 * w2 * (m2/w2 - m1/w1)^2
-    # find the left- and right-most maximum and return the threshold value in between
-    maxi = which(var == max(var, na.rm = TRUE))
-    (mids[maxi[1]] + mids[maxi[length(maxi)]] ) /2
-  })
-}
-   
 
 
 #--------------------------------
@@ -81,7 +44,10 @@ reach_index= which(reachids %in% this_river_reach_ids)
 
 nodeids=ncvar_get(SWORD_in,'nodes/node_id',verbose=FALSE)
 node_index= which(nodeids %in% this_river_node_ids)
-
+    
+node_widths= ncvar_get(SWORD_in,'nodes/max_width',verbose=FALSE)[node_index]
+reach_widths=ncvar_get(SWORD_in,'reaches/max_width',verbose=FALSE)[reach_index]
+    
 #centerline variables-------
 cl_reach_ids= ncvar_get(SWORD_in, 'centerlines/reach_id',verbose=FALSE)
 cl_index=which(cl_reach_ids %in% this_river_reach_ids)
@@ -96,32 +62,24 @@ cl_node_id=ncvar_get(SWORD_in, 'centerlines/node_id',verbose=FALSE)[cl_index]
 cl_df=data.frame(reach_id=cl_reach_ids[cl_index],lon=cl_x,lat=cl_y,cl_id=cl_id,node_id=cl_node_id)%>%
   filter(!is.na(lat))
 
-cl_df=st_as_sf(cl_df,coords=c('lon','lat'),remove=FALSE, crs='+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
-
-   # print(cl_df)
-
 cl_df=cl_df%>%
   mutate(cl_UTM_x=LongLatToUTM(cl_df$lon,cl_df$lat,utm_zone)[,1])%>%
   mutate(cl_UTM_y=LongLatToUTM(cl_df$lon,cl_df$lat,utm_zone)[,2])
+  
+cl_df=st_as_sf(cl_df,coords=c('cl_UTM_x','cl_UTM_y'),remove=FALSE, crs= paste0('+proj=utm +zone=',utm_zone,' +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs'))
+
 
 #------------------------------------------------------
 
-if(reach_or_node=='node'){
 #spatial_node_df
 #Node variables-------
 #overwriting with the index limits the RAM needed
 node_x=ncvar_get(SWORD_in, 'nodes/x',verbose=FALSE)[node_index]
-
 node_y=ncvar_get(SWORD_in, 'nodes/y',verbose=FALSE)[node_index]
-
 node_max_width=ncvar_get(SWORD_in, 'nodes/max_width',verbose=FALSE)[node_index]
-
 node_length=ncvar_get(SWORD_in, 'nodes/node_length',verbose=FALSE)[node_index]
-
 node_reachid=ncvar_get(SWORD_in, 'nodes/reach_id',verbose=FALSE)[node_index] #key field
-
 node_nodeid=nodeids[node_index]
-
 
 node_df=data.frame(lon=node_x,lat=node_y,node_id=node_nodeid,node_wmax=node_max_width,
                    node_length=node_length,reach_id=node_reachid)
@@ -164,11 +122,11 @@ spatial_node_df=node_cls%>%
   mutate(poly_list=poly_list)
 
 
-spatial_node_df=st_as_sf(spatial_node_df,sf_column_name='poly_list')
-st_crs(spatial_node_df)= paste0('+proj=utm +zone=',utm_zone,' +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs')
+spatial_node=st_as_sf(spatial_node_df,sf_column_name='poly_list')
+st_crs(spatial_node)= paste0('+proj=utm +zone=',utm_zone,' +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs')
 
-  spatial_object=spatial_node_df
-}else{
+
+
 
 #spatial_reach
 #Reach variables-------
@@ -221,116 +179,31 @@ spatial_reach=spatial_reach%>%
 
 spatial_reach=st_as_sf(spatial_reach,sf_column_name='geometry')
 st_crs(spatial_reach)= paste0('+proj=utm +zone=',utm_zone,' +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs')
-  spatial_object=spatial_reach  
-
-}
 
 
-# #read in image and classify------
+
+# #read in image 
+image_in=raster(image)
+#crop to shapefile
+    #first, crop to buffered centerline to eliminate non-river h20 if it exists
+clbuffer=st_buffer(cl_df,max(reach_widths)*scale_maxwidth)
     
-classify_water=function(Inputimagefile,spatial_object,
-                        water_index_threshold){
-    
-    #print(Inputimagefile)
-band1 =raster(Inputimagefile,band=1)
-band2 = raster(Inputimagefile,band=2)
-band3= raster(Inputimagefile,band=3)
-band4 = raster(Inputimagefile,band=4)
-
-# xmin_col=colFromX(band2,extent(spatial_node_df)@xmin)
-# xmax_col=colFromX(band2,extent(spatial_node_df)@xmax)
-# ymin_row=rowFromY(band2,extent(spatial_node_df)@ymin)
-# ymax_row=rowFromY(band2,extent(spatial_node_df)@ymax)
-#this gives us a four element vector that starts at xmin ymin and goes to xmax ymax
-
-band2_raster=crop(band2,spatial_object)
-band4_raster=crop(band4,spatial_object)
-band1_raster=crop(band1,spatial_object)
-band3_raster=crop(band3,spatial_object)
-
-NDWI = (band2_raster - band4_raster)/(band2_raster + band4_raster) 
-  
-  #first, otsu threshold the NDWI
-  otsu_level=otsu(as.matrix(NDWI),range=c(cellStats(NDWI,min),cellStats(NDWI,max)),levels=65255)
-  otsu_water=NDWI>otsu_level
+buffered_cl_image=mask(crop(image_in,clbuffer),clbuffer)
+xcell=res(buffered_cl_image)[1]
+ycell=res(buffered_cl_image)[2]
     
 
-  #then, dilate this thresholded image
-  step_one=dilate(as.matrix(otsu_water),kernel=matrix(1L,nrow=11,ncol=11))
-  step_two=step_one*as.matrix(NDWI)
-  # if (     all(is.na(step_two[step_two>0]) )     ){
-  #   width_water=NaN
-  #   names(width_water)='too small'
-  #   return(width_water)
-  # }
-    #plot(step_two)
     
-  
+node_table=data.frame(node_area=unlist(lapply(extract(buffered_cl_image, spatial_node),sum,na.rm=T)),node_id=spatial_node$node_id)%>%
+    mutate(node_area_m2=node_area*xcell*ycell)
+
+reach_table=data.frame(reach_area=unlist(lapply(extract(buffered_cl_image, spatial_reach),sum,na.rm=T)),reach_id=spatial_reach$reach_id)%>%
+    mutate(reach_area_m2=reach_area*xcell*ycell)    
     
-  
-  #now, recalculate the histogram for what is in the buffer, dropping values less than 0
-  buffered_hist=hist(as.matrix(step_two[step_two>0]),breaks=100)$density
-  
-  buffered_hist_vals=hist(as.matrix(step_two[step_two>0]),breaks=100)$breaks
-  buffered_hist_ts <- ts(buffered_hist) #save as a time series so we can use handy function below
-  
-  #calculate natural breaks in function
-  structured_breaks=strucchange::breakpoints(buffered_hist_ts~1)
-  breakpoints=buffered_hist_vals[structured_breaks$breakpoints]
-  
-  #following Cooley et al, theory would be that we want the last two breakpoints to define LL (2nd to last) and WL (last)
-  if (length(breakpoints)>1){
-  LL=breakpoints[length(breakpoints)-1]
-  WL=breakpoints[length(breakpoints)]
-  
-  water_fraction= 100*(step_two - LL) / (WL-LL)
-  binary_water=raster(water_fraction>WL)
-  }else{
-    binary_water=raster(step_two>breakpoints[1])
-  }
-  
+    image_name=substr(sub('.*\\/', '', image),1,nchar(sub('.*\\/', '', image))-4)
 
-
-labelled_ndwi=clump(binary_water)
-#select the largest
-label_counts=data.frame(raster::freq(labelled_ndwi))%>%
-    filter(value!= 'NA')%>%
-    filter(count==max(count))
-
-labelled_ndwi[labelled_ndwi[]!=label_counts$value]=0
-labelled_ndwi[labelled_ndwi[]==label_counts$value]=1
-    
-    image_name=substr(sub('.*\\/', '', Inputimagefile),1,nchar(sub('.*\\/', '', Inputimagefile))-4)
-# export water mask in a raster format
-writeRaster(labelled_ndwi, 
-            paste0(dir_output,'raster/','mask_',this_river_reach_ids,'_',this_river_node_ids,'_', image_name,'.tif'),
-           overwrite=TRUE)
-
-# plot(labelled_ndwi)
-
-total_cells=label_counts$count
-x_size=res(labelled_ndwi)[1]
-y_size=res(labelled_ndwi)[2]
-
-water_area= total_cells*x_size*y_size
-
-   # plotRGB(raster::brick(band1_raster,band2_raster,band3_raster))
-   # plot(NDWI)
-   # plot(otsu_water)
-   # plot(binary_water)
-   # plot(labelled_ndwi)
-
-output=data.frame(node_id=this_river_node_ids,reach_id=this_river_reach_ids,water_area_m2=water_area,
-                     image_name=image_name,datetime=datetime)
-
-   
-    } #end image function
-    
-output=do.call(rbind,lapply(image_list,classify_water,spatial_object= spatial_object,  water_index_threshold=water_index_threshold)    )
-    
-
-    write.csv(output,paste0(dir_output,'CSV/','reach_',this_river_reach_ids,'_node_',this_river_node_ids,'.csv'))
- 
+write.csv(node_table,paste0(dir_output,rivername,'_',image_name,'_node_areas.csv'),row.names=FALSE)
+write.csv(reach_table,paste0(dir_output,rivername,'_',image_name,'_reach_areas.csv'),row.names=FALSE)
 
     
 

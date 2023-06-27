@@ -14,6 +14,7 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
   #surface type flag - 10, 11, or 12. Simialrly, only code 12 incicates quality data
   
   
+  
   Lat=ncvar_get(gnss_nc,'latitude')
   Lon=ncvar_get(gnss_nc,'longitude')
   gnss_wse= ncvar_get(gnss_nc,'wse')
@@ -29,7 +30,7 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
   Info_event_end=ncvar_get(gnss_nc,'infoEventEndTime')
   
 
-  
+
   Info_df=data.frame(Event_code=Info_event, Event_start= Info_event_start, Event_end=Info_event_end)%>%
     mutate(Event_start_UTC = as.POSIXct(Event_start ,origin='2000-01-01 00:00:00',tz='UTC'))%>% 
     mutate(Event_end_UTC = as.POSIXct(Event_end ,origin='2000-01-01 00:00:00',tz='UTC' ))%>%
@@ -42,7 +43,7 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
            Event_code == 'powerlines' | Event_code == 'powerline' | Event_code == 'Birdge')
   
   
-  
+
   gnss_log=data.frame(gnss_Lat=Lat,gnss_Lon=Lon,gnss_wse=gnss_wse,gnss_time_tai=gnss_time_tai,gnss_uncertainty_m=gnss_uncertainty,
                       gnss_surf_flag=gnss_surf_flag,gnss_motion_flag=gnss_motion_flag, height_above_ellipsoid= height_above_ellipsoid)%>%
     #R's native POSIXCT also doesn't have leap seconds, so we're good
@@ -55,6 +56,7 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
     filter(gnss_uncertainty_m<0.05)%>%
     mutate(drift_id= sub('',"",log_file))
   
+
   #need to recurse this, so a for loop is actually needed!
 if (nrow(Info_df)>0){
   for(i in 1:nrow(Info_df)){

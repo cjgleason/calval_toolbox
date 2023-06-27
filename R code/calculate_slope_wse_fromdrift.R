@@ -15,6 +15,8 @@ LongLatToUTM<-function(x,y,zone){
   res=st_as_sf(res)
   return(data.frame(x=st_coordinates(res)[,1],y=st_coordinates(res)[,2]))
 }
+    
+  
 
 #get SWORD data---------------------------------------
 SWORD_in=nc_open(SWORD_path,verbose=FALSE)
@@ -26,6 +28,7 @@ nodeids=ncvar_get(SWORD_in,'nodes/node_id',verbose=FALSE)
 node_index= which(nodeids %in% this_river_node_ids)
 #-----------------------------------------------------
 
+ 
 #Node variables-------
 #overwriting with the index limits the RAM needed
 node_x=ncvar_get(SWORD_in, 'nodes/x',verbose=FALSE)[node_index]
@@ -44,8 +47,7 @@ node_nodeid=nodeids[node_index]
 node_df=data.frame(lon=node_x,lat=node_y,node_id=node_nodeid,node_wmax=node_max_width,
                    node_length=node_length,reach_id=node_reachid)
 
-   # print(node_df)
-
+    
 node_df= node_df%>%
   mutate(node_UTM_x=LongLatToUTM(node_df$lon,node_df$lat,utm_zone)[,1])%>%
   mutate(node_UTM_y=LongLatToUTM(node_df$lon,node_df$lat,utm_zone)[,2])

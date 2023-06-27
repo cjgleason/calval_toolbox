@@ -19,24 +19,29 @@ filename=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/'
     
     #kluge that quickly gets what we want by reading in the csv flat and pulling the first entry
       
+      # print(raw_pt_file)
+      # print(pt_data_directory)
     
-    pt_serial = strtoi(read.csv(raw_pt_file)$Serial_number.[1])
+    pt_serial = strtoi(read.csv(paste0(pt_data_directory,raw_pt_file))$Serial_number.[1])
       
-  
-                   
+      
     #11 lines of headers to skip to deal with read in function
     
     #!!!!!!!!!!!!!!
     #The willamette epxeriment data have a missing header, so we skip the 12th line and assign our own header. Deadly !
     #!!!!!!!!!!!!!
-    pt_data=read.csv(raw_pt_file,skip=11,header=TRUE) %>%
+    pt_data=read.csv(paste0(pt_data_directory,raw_pt_file),skip=11,header=TRUE) %>%
       mutate(pt_serial=pt_serial)
     
+      print(head(pt_data))
+      bonk
     
+          
     #     pt_data= read.csv(paste0(pt_data_directory,raw_pt_file,'.csv'),skip=12,header=TRUE,fill=TRUE,col.names = c('Date','Time','ms','Level','Temperature')) %>%
     #       mutate(pt_serial=pt_serial)
     #----------------------------
     
+   
     #read in offset--------------
     keyfile=read.csv(pt_key_file,stringsAsFactors = FALSE)%>%
       mutate('driftID_install'= Final_Install_Log_File)%>%
@@ -94,7 +99,7 @@ filename=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/'
       
       #print('gnss_log')  
       
-      time_thresh=1000
+      #time_thresh=1000
       #half a second faster to join first on time and then on space
       clean_pt_time=difference_inner_join(prepped_pt,gnss_log,by='datetime',max_dist=time_thresh,distance_col='test')
 
