@@ -19,23 +19,21 @@ filename=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/'
     
     #kluge that quickly gets what we want by reading in the csv flat and pulling the first entry
       
-      # print(raw_pt_file)
-      # print(pt_data_directory)
+ print(raw_pt_file)
     
-    pt_serial = strtoi(read.csv(paste0(pt_data_directory,raw_pt_file))$Serial_number.[1])
+   # pt_serial = strtoi(read.csv(paste0(pt_data_directory,raw_pt_file),header=FALSE)$Serial_number.[1])
+
+     pt_serial=as.integer(read.table(paste0(pt_data_directory,raw_pt_file), header = FALSE, nrow = 1)$V1)
       
-      
+
     #11 lines of headers to skip to deal with read in function
-    
-    #!!!!!!!!!!!!!!
-    #The willamette epxeriment data have a missing header, so we skip the 12th line and assign our own header. Deadly !
-    #!!!!!!!!!!!!!
-    pt_data=read.csv(paste0(pt_data_directory,raw_pt_file),skip=11,header=TRUE) %>%
+      
+    pt_data=read.csv(paste0(pt_data_directory,raw_pt_file),skip=10,header=TRUE) %>%
       mutate(pt_serial=pt_serial)
     
-      print(head(pt_data))
-      bonk
-    
+     #  print(head(pt_data))
+     #  print(tail(pt_data))
+     # bonk
           
     #     pt_data= read.csv(paste0(pt_data_directory,raw_pt_file,'.csv'),skip=12,header=TRUE,fill=TRUE,col.names = c('Date','Time','ms','Level','Temperature')) %>%
     #       mutate(pt_serial=pt_serial)
@@ -46,19 +44,21 @@ filename=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/'
     keyfile=read.csv(pt_key_file,stringsAsFactors = FALSE)%>%
       mutate('driftID_install'= Final_Install_Log_File)%>%
       mutate('driftID_uninstall'= Final_Uninstall_Log_File)%>%
-      mutate(pt_serial=PT_Serial)
+      mutate(pt_serial=as.integer(PT_Serial))
     #left joining the key in 'offset' gets us a tidy data frame where the info from the key is promulgated to just that pt. a right join would give
     #an n fold expansion across n pts
     pt_data=pt_data %>%
       left_join(keyfile,by='pt_serial')%>%
-      mutate(datetime=as.POSIXct(paste(Date,Time),format= "%m/%d/%Y %I:%M:%S %p"))%>%
+      mutate(datetime=as.POSIXct(paste(Date,Time),format= "%Y/%m/%d %H:%M:%S"))%>%
       mutate(pt_Lat= Lat_WGS84)%>%
       mutate(pt_Lon=Long_WGS84)%>%
       mutate(pt_time_UTC=datetime)
     
-    
-    # print(head(pt_data))
-    
+# print('does it have datetime here?')
+#            print(head(pt_data))
+#       print('end of that')
+     #  print(tail(pt_data))
+      #bonk
     
     #----------------------------
   } # end pt function
@@ -68,8 +68,7 @@ filename=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/'
      log_files=rbind( unique(prepped_pt$driftID_install),unique(prepped_pt$driftID_uninstall)) #need both files to work on
     #log_files=unique(prepped_pt$driftID_install)
     log_files=log_files[!is.na(log_files)]
-    # print(log_files)
-    
+   
     
     if(length(log_files)==0){
       return(NA)
@@ -85,29 +84,40 @@ filename=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/'
       
       logstring=str_replace(paste0(gnss_drift_data_directory,log_file,'.csv'),"L0",'L2')
       #standardized files means we can pull this in a fixed position
-      string_to_match=substr(logstring,nchar(logstring)-35,nchar(logstring)-4)
-      
+      splitter=strsplit(logstring,'_')
+        #match the first and second dates
+        string_to_match=paste(splitter[[1]][9], splitter[[1]][10],sep='_')
+
       correct_drift_index=which(!is.na(str_match(list.files(gnss_drift_data_directory),string_to_match)))
+        
+    
       
       driftstring=list.files(gnss_drift_data_directory,full.names=TRUE)[correct_drift_index]
       
-      #print(driftstring)
-      
+    #print(logstring)
+   
       gnss_log=read.csv(driftstring,header=TRUE,stringsAsFactors = FALSE)%>%
         mutate(datetime=gnss_time_UTC)%>%
         mutate(datetime=as.POSIXct(datetime))#needed as when it gets written to csv it becomes not a posix object
       
-      #print('gnss_log')  
-      
+      # print('gnss_log')  
+      # print(head(gnss_log))
       #time_thresh=1000
       #half a second faster to join first on time and then on space
-      clean_pt_time=difference_inner_join(prepped_pt,gnss_log,by='datetime',max_dist=time_thresh,distance_col='test')
+     
+ # print(head(prepped_pt))
+ #        print(tail(prepped_pt))
+        # print(head(gnss_log))
+        # print(tail(gnss_log))
+       clean_pt_time=difference_inner_join(prepped_pt,gnss_log,by='datetime',max_dist=time_thresh,distance_col='test')
 
+        # print(head(clean_pt_time))
+        # bonk
       
       #need lon then lat
       distance_m=geodist(cbind(clean_pt_time$pt_lon, clean_pt_time$pt_lat), cbind(clean_pt_time$gnss_Lon, clean_pt_time$gnss_Lat), paired=TRUE,measure='haversine')
     
-      #print('distance_m')
+      # print('distance_m')
       clean_pt=cbind(clean_pt_time,distance_m)%>%
         filter(distance_m<dist_thresh)%>%
         #ok, let's select for stuff we want to keep now
@@ -115,13 +125,14 @@ filename=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/'
                   pt_serial=pt_serial,
                   gnss_lat=gnss_Lat, gnss_lon=gnss_Lon, pt_lat=pt_lat, pt_lon=pt_lon,gnss_pt_dist_m=distance_m )
       
-      
+  
+     # print(clean_pt)
       #next, ensure there are enough gnss points to make a valid offset correction
       if(nrow(clean_pt)==0){
         return(NA)
         
       }
-      
+       
       #now, multiple gnss points go to one pt. Need to group by pt timestep and apply the correction at that level
       #the differences in these offsets is the uncertainty of this mapping
       
@@ -156,21 +167,28 @@ filename=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/'
     #loop through the log files, find the right gnss data to associate with the install,
     # average the gnss height within a distance threshold, and then create a corrected pt df
     #by binding each log file together. This is unnecessary, but will handle that one special case
+   
+ #print(log_files)   
     finalpt=do.call(rbind,lapply(log_files,unit_pt_process,prepped_pt=prepped_pt,dist_thresh=dist_thresh,
                                  time_thresh=time_thresh,gnss_drift_data_directory=gnss_drift_data_directory))
     
-    
+
     
   }
   
   #read in pt
   prepped_pt=handle_raw_pt(raw_pt_file,pt_key_file,pt_data_directory,gnss_drift_data_directory)%>%
     transmute(pt_time_UTC=pt_time_UTC,pt_lat=pt_Lat,pt_lon=pt_Lon,
-              pt_install_UTC=as.POSIXct(paste(Date_GNSS_Install,Time_GNSS_Install_Start),format= "%m/%d/%Y %H:%M"),
-              pt_uninstall_UTC=as.POSIXct(paste(Date_GNSS_Uninstall,Time_GNSS_Uninstall_End),format= "%m/%d/%Y %H:%M"),
+             
+              pt_install_UTC=as.POSIXct(paste(Date_GNSS_Install,Time_GNSS_Install_Start_UTC),format= "%m/%d/%Y %H:%M"),
+              pt_uninstall_UTC=as.POSIXct(paste(Date_GNSS_Uninstall,Time_GNSS_Uninstall_End_UTC),format= "%m/%d/%Y %H:%M"),
               install_method=Install_method, pt_serial=pt_serial,
-              pt_level=LEVEL,temperature=TEMPERATURE,driftID_install=driftID_install,driftID_uninstall=driftID_uninstall,
+              pt_level=Level,temperature=Temperature,driftID_install=driftID_install,driftID_uninstall=driftID_uninstall,
               datetime=datetime)
+    
+    # print('boo')
+    # print(prepped_pt)
+    # print('boo')
   
   if(sum(is.na(prepped_pt$pt_lat))==nrow(prepped_pt)){
     print('this pt isnt in the key')

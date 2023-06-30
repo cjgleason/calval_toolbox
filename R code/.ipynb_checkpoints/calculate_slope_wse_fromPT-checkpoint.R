@@ -11,7 +11,7 @@ calculate_slope_wse_fromPT=function(keyfile,pt_files,SWORD_path,SWORD_reach,this
 
   #read in key file
   key_df=read.csv(keyfile)%>%
-    transmute(pt_serial=PT_Serial,node_id=Node_ID,reach_id=as.character(Reach_ID),us_reach_id=as.character(US_Reach_ID),ds_reach_id=as.character(DS_Reach_ID))
+    transmute(pt_serial=as.integer(PT_Serial),node_id=Node_ID,reach_id=as.character(Reach_ID),us_reach_id=as.character(US_Reach_ID),ds_reach_id=as.character(DS_Reach_ID))
   #read in SWORD
   
   SWORD_in=nc_open(SWORD_path,verbose=FALSE)

@@ -42,7 +42,6 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
            Event_code=='Bridges' |Event_code=='bridges'| Event_code == 'Powerline'|
            Event_code == 'powerlines' | Event_code == 'powerline' | Event_code == 'Birdge')
   
-  
 
   gnss_log=data.frame(gnss_Lat=Lat,gnss_Lon=Lon,gnss_wse=gnss_wse,gnss_time_tai=gnss_time_tai,gnss_uncertainty_m=gnss_uncertainty,
                       gnss_surf_flag=gnss_surf_flag,gnss_motion_flag=gnss_motion_flag, height_above_ellipsoid= height_above_ellipsoid)%>%
@@ -55,6 +54,7 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
     #filter for self ID uncertainty at 5cm
     filter(gnss_uncertainty_m<0.05)%>%
     mutate(drift_id= sub('',"",log_file))
+
   
 
   #need to recurse this, so a for loop is actually needed!

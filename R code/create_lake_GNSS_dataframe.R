@@ -1,4 +1,4 @@
-create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_directory){
+create_lake_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_directory){
   library(ncdf4)
   library(stringr)
   library(dplyr)
@@ -48,14 +48,12 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
     #R's native POSIXCT also doesn't have leap seconds, so we're good
     mutate(gnss_time_UTC = as.POSIXct(gnss_time_tai-37,origin='2000-01-01 00:00:00',tz='UTC' ))%>% # +37 because netcdf states a 37 second difference between TAI and UTC. only apply this here
     #need this to join, but let's preserve original
-    filter(gnss_surf_flag==12)%>%
-    filter(gnss_motion_flag==2)%>%
     mutate(gnss_ellipsoid=gnss_ellipsoid)%>%
     #filter for self ID uncertainty at 5cm
     filter(gnss_uncertainty_m<0.05)%>%
     mutate(drift_id= sub('',"",log_file))
+    
 
-  
 
   #need to recurse this, so a for loop is actually needed!
 if (nrow(Info_df)>0){
