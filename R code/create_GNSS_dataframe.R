@@ -37,11 +37,15 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
     select(-Event_end,-Event_start)%>%
     #add 1 minutes to the event codes
     mutate(Event_start_UTC=Event_start_UTC-1*60)%>%
-    mutate(Event_end_UTC=Event_end_UTC+1*60)%>%
-    filter(Event_code=='Bridge' | Event_code == 'Powerlines' | Event_code=='bridge' |
-           Event_code=='Bridges' |Event_code=='bridges'| Event_code == 'Powerline'|
-           Event_code == 'powerlines' | Event_code == 'powerline' | Event_code == 'Birdge')
-  
+     mutate(Event_end_UTC=Event_end_UTC+1*60)%>%
+    mutate(Event_code=case_when(Event_code=='Bridge' |Event_code=='bridge' |
+           Event_code=='Bridges' |Event_code=='bridges'|Event_code == 'Birdge' ~ 'bridge', Event_code == 'Powerline'|
+           Event_code == 'powerlines' | Event_code == 'powerline' |  Event_code == 'Powerlines'  |  Event_code == 'power lines' ~ 'powerlines' ,
+           Event_code == 'Top of Reach' | Event_code == 'top of reach' | Event_code == 'Top of reach' |  Event_code == 'top of Reach' |
+           Event_code == 'Bottom of Reach' | Event_code == 'bottom of reach' | Event_code == 'Bottom of reach' |  Event_code == 'bottom of Reach' |
+           Event_code == 'tp' | Event_code == 'TP' ~'TP'))%>%
+    filter(!is.na(Event_code))
+    
 
 
   gnss_log=data.frame(gnss_Lat=Lat,gnss_Lon=Lon,gnss_wse=gnss_wse,gnss_time_tai=gnss_time_tai,gnss_uncertainty_m=gnss_uncertainty,
@@ -56,31 +60,65 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
     filter(gnss_uncertainty_m<0.05)%>%
     mutate(drift_id= sub('',"",log_file))
 
+ #at this point, we have two pieces of info- turning points that need to be borken ito separate drifts, and events we need to filter out
+    #let's make two info_dfs
     
-  
+    bad_info_df= filter(Info_df,Event_code == 'bridge' | Event_code == 'powerlines')
+    good_info_df=filter(Info_df,Event_code=='TP')
 
+  #get rid of the bad data
   #need to recurse this, so a for loop is actually needed!
-if (nrow(Info_df)>0){
-  for(i in 1:nrow(Info_df)){
+if (nrow(bad_info_df)>0){
+  for(i in 1:nrow(bad_info_df)){
     gnss_log=filter(gnss_log, gnss_time_UTC >= Info_df$Event_end_UTC[i] | gnss_time_UTC <= Info_df$Event_start_UTC[i] )
     
   }
 }
-  
+    
   if (nrow(gnss_log)==0){
-    print(paste('filename',log_file,'bonked'))
+    print(paste('filename',log_file,'bonked'))  
+    nc_close(gnss_nc)
     return(NA)
   }
   
-  plot(gnss_log$gnss_time_UTC,gnss_log$gnss_wse)
+if (nrow(good_info_df)==0){
+    write.csv(gnss_log,paste0(output_directory,log_file,"_",as.character(1),'.csv'))
+    nc_close(gnss_nc)
+    return(NA)
+  }
+    #now, split the file based on turning points.
+    #tricky.
+    #there could be an infinite number of turning points, so we need to pre-assess how many splits we'll make
+    #add a TP at the very beginning of the new good data
+    start_tp=data.frame(Event_code='TP',Event_start_UTC=min(gnss_log$gnss_time_UTC),Event_end_UTC=min(gnss_log$gnss_time_UTC))
+    end_tp=data.frame(Event_code='TP',Event_start_UTC=max(gnss_log$gnss_time_UTC),Event_end_UTC=max(gnss_log$gnss_time_UTC))
+    good_info_df=rbind(start_tp,good_info_df,end_tp)%>%
+    arrange(Event_start_UTC)#gotta be sorted
+    
+
+ 
   
+    split_on_turning_point=function(row,good_info_df,output_directory,log_file){
+            this_tp=good_info_df[row,]
+            next_tp=good_info_df[(row+1),]
+            new_df=filter(gnss_log, gnss_time_UTC >= this_tp$Event_end_UTC & gnss_time_UTC <= next_tp$Event_start_UTC )
+     
+            write.csv(new_df,paste0(output_directory,log_file,"_",as.character(row),'.csv'))
+        print(paste0(output_directory,log_file,"_",as.character(row),'.csv'))
+       }  
+    
+    
+
+    new_gnss_dfs=lapply(seq(1,(nrow(good_info_df)-1),by=1),split_on_turning_point,
+                        good_info_df=good_info_df,
+                       output_directory=output_directory,
+                       log_file=log_file)
+  
+
+  
+
+
   nc_close(gnss_nc)
-  
-  print(paste0(output_directory,log_file,'.csv'))
-  
-  write.csv(gnss_log,paste0(output_directory,log_file,'.csv'))
-
-
 
 
 }
