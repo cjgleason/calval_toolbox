@@ -14,53 +14,43 @@ library(ncdf4)
 filename=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/')[[1]])])
     
   handle_raw_pt=function(raw_pt_file,pt_key_file,pt_data_directory,gnss_drift_data_directory){
-    #read in raw pt--------------
-    #ID could come from the filename, right now it is reading the serial number from the file
-    
-    #kluge that quickly gets what we want by reading in the csv flat and pulling the first entry
-      
- # print(raw_pt_file)
-    
-   # pt_serial = strtoi(read.csv(paste0(pt_data_directory,raw_pt_file),header=FALSE)$Serial_number.[1])
-
-     pt_serial=as.integer(read.table(paste0(pt_data_directory,raw_pt_file), header = FALSE, nrow = 1)$V1)
-      
-
-    #11 lines of headers to skip to deal with read in function
+   
+           pt_serial=as.integer(read.table(paste0(pt_data_directory,raw_pt_file), header = FALSE, nrow = 1)$V1)
       
     pt_data=read.csv(paste0(pt_data_directory,raw_pt_file),skip=10,header=TRUE) %>%
-      mutate(pt_serial=pt_serial)
-    
-     #  print(head(pt_data))
-     #  print(tail(pt_data))
-     # bonk
-          
-    #     pt_data= read.csv(paste0(pt_data_directory,raw_pt_file,'.csv'),skip=12,header=TRUE,fill=TRUE,col.names = c('Date','Time','ms','Level','Temperature')) %>%
-    #       mutate(pt_serial=pt_serial)
-    #----------------------------
-    
+      mutate(pt_serial=as.integer(pt_serial))
+      
+      #this !@#$! field sometimes has AM/PM and sometimes 24 hour time. we need to parse it to figure out which is which and then process.
+            
+   sum1=sum(!is.na(str_match(pt_data$Time, 'pm')))
+   sum2=sum(!is.na(str_match(pt_data$Time, 'am')))
+   sum3=sum(!is.na(str_match(pt_data$Time, 'PM')))
+   sum4=sum(!is.na(str_match(pt_data$Time, 'AM')))
+      
+      if(any(c(sum1,sum2,sum3,sum4)>0)){ #this means we're in ampmtime.
+          pt_data=pt_data%>%
+        mutate(datetime=as.POSIXct(paste(Date,Time),format="%m/%d/%Y %I:%M:%S %p"))
+        }else{ #24 hour time
+          pt_data=pt_data%>%
+        mutate(pt_data,datetime=as.POSIXct(paste(Date,Time),format= "%Y/%m/%d %H:%M:%S"))
+      }
+         
+         #print(head(pt_data))
    
     #read in offset--------------
     keyfile=read.csv(pt_key_file,stringsAsFactors = FALSE)%>%
       mutate('driftID_install'= Final_Install_Log_File)%>%
       mutate('driftID_uninstall'= Final_Uninstall_Log_File)%>%
       mutate(pt_serial=as.integer(PT_Serial))
+
+      
     #left joining the key in 'offset' gets us a tidy data frame where the info from the key is promulgated to just that pt. a right join would give
     #an n fold expansion across n pts
     pt_data=pt_data %>%
       left_join(keyfile,by='pt_serial')%>%
-      mutate(datetime=as.POSIXct(paste(Date,Time),format= "%Y/%m/%d %H:%M:%S"))%>%
       mutate(pt_Lat= Lat_WGS84)%>%
       mutate(pt_Lon=Long_WGS84)%>%
       mutate(pt_time_UTC=datetime)
-    
-# print('does it have datetime here?')
-#            print(head(pt_data))
-#       print('end of that')
-     #  print(tail(pt_data))
-      #bonk
-    
-    #----------------------------
   } # end pt function
   correct_pt=function(prepped_pt,dist_thresh,time_thresh,gnss_drift_data_directory){
     
