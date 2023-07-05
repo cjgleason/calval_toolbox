@@ -19,7 +19,7 @@ filename=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/'
     
     #kluge that quickly gets what we want by reading in the csv flat and pulling the first entry
       
- print(raw_pt_file)
+ # print(raw_pt_file)
     
    # pt_serial = strtoi(read.csv(paste0(pt_data_directory,raw_pt_file),header=FALSE)$Serial_number.[1])
 
@@ -86,15 +86,20 @@ filename=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/'
       #standardized files means we can pull this in a fixed position
       splitter=strsplit(logstring,'_')
         #match the first and second dates
-        string_to_match=paste(splitter[[1]][9], splitter[[1]][10],sep='_')
+        if (length(splitter[[1]]) ==10){
+              string_to_match=paste(splitter[[1]][8], splitter[[1]][9],sep='_')
+            }else{
+        string_to_match=paste(splitter[[1]][9], splitter[[1]][10],sep='_')}
 
-      correct_drift_index=which(!is.na(str_match(list.files(gnss_drift_data_directory),string_to_match)))
+     
         
-    
+        correct_drift_index=which(!is.na(str_match(list.files(gnss_drift_data_directory),string_to_match)))
+        
+       
       
       driftstring=list.files(gnss_drift_data_directory,full.names=TRUE)[correct_drift_index]
       
-    #print(logstring)
+   
    
       gnss_log=read.csv(driftstring,header=TRUE,stringsAsFactors = FALSE)%>%
         mutate(datetime=gnss_time_UTC)%>%
@@ -111,17 +116,17 @@ filename=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/'
         # print(tail(gnss_log))
        clean_pt_time=difference_inner_join(prepped_pt,gnss_log,by='datetime',max_dist=time_thresh,distance_col='test')
 
-        # print(head(clean_pt_time))
+       # print(head(clean_pt_time))
         # bonk
       
       #need lon then lat
-      distance_m=geodist(cbind(clean_pt_time$pt_lon, clean_pt_time$pt_lat), cbind(clean_pt_time$gnss_Lon, clean_pt_time$gnss_Lat), paired=TRUE,measure='haversine')
+      distance_m=geodist(cbind(clean_pt_time$pt_lon, clean_pt_time$pt_lat),    cbind(clean_pt_time$gnss_Lon, clean_pt_time$gnss_Lat), paired=TRUE,measure='haversine')
     
       # print('distance_m')
-      clean_pt=cbind(clean_pt_time,distance_m)%>%
-        filter(distance_m<dist_thresh)%>%
+    clean_pt=cbind(clean_pt_time,distance_m)%>%
+    filter(distance_m<dist_thresh)%>%
         #ok, let's select for stuff we want to keep now
-        transmute(pt_level=pt_level, temperature=temperature,gnss_time_UTC=as.POSIXct(gnss_time_UTC,format ="%Y-%m-%d %H:%M:%S"),gnss_wse=gnss_wse,pt_time_UTC=pt_time_UTC,
+    transmute(pt_level=pt_level, temperature=temperature,gnss_time_UTC=as.POSIXct(gnss_time_UTC,format ="%Y-%m-%d %H:%M:%S"),gnss_wse=gnss_wse,pt_time_UTC=pt_time_UTC,
                   pt_serial=pt_serial,
                   gnss_lat=gnss_Lat, gnss_lon=gnss_Lon, pt_lat=pt_lat, pt_lon=pt_lon,gnss_pt_dist_m=distance_m )
       
@@ -154,7 +159,7 @@ filename=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/'
         mutate(pt_wse_sd= pt_correction_sd + 0.001) #sets the uncertainty to equal to the variance in all of the offsets used to create the 
       #PT wse, plus 1mm for PT meas error
       
-      # print('wse_pt')
+      # print(head(wse_pt))
       
       return(wse_pt)
       
@@ -167,8 +172,10 @@ filename=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/'
     #loop through the log files, find the right gnss data to associate with the install,
     # average the gnss height within a distance threshold, and then create a corrected pt df
     #by binding each log file together. This is unnecessary, but will handle that one special case
-   
- #print(log_files)   
+ 
+      #in case the PT went dry, need to eliminate missing installa nd uninstall files
+      log_files=log_files[log_files != ""]
+     # print(log_files)
     finalpt=do.call(rbind,lapply(log_files,unit_pt_process,prepped_pt=prepped_pt,dist_thresh=dist_thresh,
                                  time_thresh=time_thresh,gnss_drift_data_directory=gnss_drift_data_directory))
     
@@ -186,7 +193,8 @@ filename=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/'
               pt_level=Level,temperature=Temperature,driftID_install=driftID_install,driftID_uninstall=driftID_uninstall,
               datetime=datetime)
     
-    # print('boo')
+    
+
     # print(prepped_pt)
     # print('boo')
   
@@ -195,13 +203,13 @@ filename=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/'
     saveRDS(prepped_pt,file=paste0(flagged_pt_output_directory,filename,'_',prepped_pt$pt_serial[1],'.rds'))
     return(NA)
   }
-  
-  
-  
+    
   #make gnss offset
   offset_pt=correct_pt(prepped_pt,dist_thresh,time_thresh,gnss_drift_data_directory)
-  
-  
+
+
+    
+    
   if (all(is.na(offset_pt))){
     print(filename)
     print('There are no gnss data within the space-time thresholds')
