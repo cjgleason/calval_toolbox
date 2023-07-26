@@ -1,17 +1,28 @@
-calculate_slope_wse_fromPT=function(keyfile,pt_files,SWORD_path,SWORD_reach,this_river_reach_ids,
-                                    alongstream_error,crossstream_error,measurement_error,output_directory,rivername){
-  # keyfile='Willamette/WM_Key.csv'
-  # pt_files=paste0('Willamette/Willamette munged pts/',list.files('Willamette/Willamette munged pts/'))
-  # SWORD_path='na_sword_v11.nc'
-  # SWORD_reach= read.csv('Willamette/Willamette nodes.csv')
-  # this_river_reach_ids= as.numeric(as.character(unique(SWORD_reach$reach_id)))
+
+pt_files=list.files('/nas/cee-water/cjgleason/calval/Processed data/CU/Munged PT/processed_2023_05_11/',full.names=TRUE)
+SWORD_reach= read.csv('/nas/cee-water/cjgleason/calval/Processed data/CU/SWOTCalVal_WM_KEY_20230326_20230509.csv')
+this_river_reach_ids= as.numeric(as.character(unique(SWORD_reach$Reach_ID)))
+
+
+
+alongstream_error= 0.0001*200 #m error we get from the downstream slope of a reach in a node. This placeholder is a 1e-4 slope over a 200m node
+crossstream_error= 0.005 #m error we get from PT not representing cross stream superelevation/noise in a node
+measurement_error= 0.001 #m error we get from PT measurement itself 
+keyfile='/nas/cee-water/cjgleason/calval/Processed data/CU/SWOTCalVal_WM_KEY_20230326_20230509.csv'
+
+  SWORD_path=paste0('/nas/cee-water/cjgleason/calval/SWORD_15/netcdf/','na',
+                    '_sword_v15.nc')
+ 
+  rivername='WM'
+  output_directory= '/nas/cee-water/cjgleason/calval/Processed data/CU/Data frames/reprocessed_2023_05_10/'
+
+
   
   library(ncdf4)
   library(dplyr)
-
   #read in key file
-  key_df=keyfile%>%
-    transmute(pt_serial=as.integer(PT_Serial),node_id=Node_ID,reach_id=as.character(Reach_ID),us_reach_id=as.character(US_Reach_ID),ds_reach_id=as.character(DS_Reach_ID))
+  key_df=read.csv(keyfile)%>%
+    transmute(pt_serial=PT_Serial,node_id=Node_ID,reach_id=as.character(Reach_ID),us_reach_id=as.character(US_Reach_ID),ds_reach_id=as.character(DS_Reach_ID))
   #read in SWORD
   
   SWORD_in=nc_open(SWORD_path,verbose=FALSE)
@@ -26,8 +37,6 @@ calculate_slope_wse_fromPT=function(keyfile,pt_files,SWORD_path,SWORD_reach,this
     transmute(pt_serial,pt_time_UTC,pt_wse,pt_wse_sd)%>%
     left_join(key_df,by='pt_serial')
   
-
-    
   #calculate node wse
   node_df=pt_df%>%
     group_by(node_id,pt_time_UTC)%>%
@@ -36,7 +45,6 @@ calculate_slope_wse_fromPT=function(keyfile,pt_files,SWORD_path,SWORD_reach,this
     mutate(node_id=as.character(node_id))%>%
     distinct()#based on grouping, it will repeat
   
- 
   #calculate reach wse
   reach_df=pt_df%>%
     group_by(reach_id,pt_time_UTC)%>%
@@ -55,7 +63,7 @@ calculate_slope_wse_fromPT=function(keyfile,pt_files,SWORD_path,SWORD_reach,this
     group_by(node_id,pt_time_UTC)%>%
     mutate(mean_pt_node = mean(pt_wse,na.rm=TRUE), sd_pt_node =sd(pt_wse,na.rm=TRUE))%>%
     ungroup()
-    
+  
    us_df=filter(slope_df,node_id == upstream_node)%>%
      transmute(reach_id=reach_id,pt_time_UTC=pt_time_UTC,upstream_node=upstream_node,us_mean=mean_pt_node,us_sd=sd_pt_node)
    #if there is only a single PT in the node, we need to set the sd manually to a small number (measurement uncertainty)
@@ -76,12 +84,10 @@ calculate_slope_wse_fromPT=function(keyfile,pt_files,SWORD_path,SWORD_reach,this
     distinct()%>%
     select(-reach_length,-pt_wse_sd,-pt_wse,-pt_serial,-node_id)
  
- 
   # print(paste0(output_directory,'reach/',rivername,'_','PT_reach_slope.csv'))
   write.csv(slope_df2,file=paste0(output_directory,'/reach/',rivername,'_','PT_reach_slope.csv'),row.names=FALSE)
   write.csv(reach_df,file=paste0(output_directory,'/reach/',rivername,'_','PT_reach_wse.csv'),row.names=FALSE)
   write.csv(node_df,file=paste0(output_directory,'/node/',rivername,'_','PT_node_wse.csv'),row.names=FALSE)
   
-
-
-}
+  
+  

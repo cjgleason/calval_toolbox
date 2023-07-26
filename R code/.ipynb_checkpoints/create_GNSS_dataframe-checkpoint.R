@@ -1,4 +1,4 @@
-create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_directory){
+create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_directory,rivername,keyfile){
   library(ncdf4)
   library(stringr)
   library(dplyr)
@@ -59,6 +59,47 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
     #filter for self ID uncertainty at 5cm
     filter(gnss_uncertainty_m<0.05)%>%
     mutate(drift_id= sub('',"",log_file))
+ 
+    
+#     print(gnss_motion_flag)
+#     print(gnss_log)
+#     print(log_file)
+#     bonk
+
+#waimak is special
+    if (rivername =='WK'){
+        
+        #check to see if this is a PT install file
+        #if so, it will be in the key
+        #in that case, we need to include the motion code of 0
+    installfile=keyfile$Final_Install_Log_File
+    takeoutfile= keyfile$Final_Uninstall_Log_File
+    filenames=c(installfile,takeoutfile)
+        
+#         print('in keyfile')
+       # print(filenames)
+#         print('from raw GNSS')
+#         print(log_file)
+  
+#          print('detector')
+#         print(str_replace(log_file,"L2",'L0'))
+#         print(any(str_detect(filenames,str_replace(log_file,"L2",'L0')),na.rm=TRUE))
+   
+       
+    if(any(str_detect(str_replace(log_file,"L2",'L0'),filenames),na.rm=TRUE)){
+        
+       #this means the fileis in the key, and is a PT occupy. We therefore need a '0' motion code in this case.
+        
+  gnss_log=data.frame(gnss_Lat=Lat,gnss_Lon=Lon,gnss_wse=gnss_wse,gnss_time_tai=gnss_time_tai,gnss_uncertainty_m=gnss_uncertainty,
+                      gnss_surf_flag=gnss_surf_flag,gnss_motion_flag=gnss_motion_flag, height_above_ellipsoid= height_above_ellipsoid)%>%
+    #R's native POSIXCT also doesn't have leap seconds, so we're good
+    mutate(gnss_time_UTC = as.POSIXct(gnss_time_tai-37,origin='2000-01-01 00:00:00',tz='UTC' ))%>% # +37 because netcdf states a 37 second difference between TAI and UTC. only apply this here
+    mutate(gnss_ellipsoid=gnss_ellipsoid)%>%
+    #filter for self ID uncertainty at 5cm
+    filter(gnss_uncertainty_m<0.05)%>%
+    mutate(drift_id= sub('',"",log_file))
+            }
+        }
 
  #at this point, we have two pieces of info- turning points that need to be borken ito separate drifts, and events we need to filter out
     #let's make two info_dfs
@@ -75,6 +116,7 @@ if (nrow(bad_info_df)>0){
   }
 }
     
+
   if (nrow(gnss_log)==0){
     print(paste('filename',log_file,'bonked'))  
     nc_close(gnss_nc)
@@ -95,16 +137,18 @@ if (nrow(good_info_df)==0){
     good_info_df=rbind(start_tp,good_info_df,end_tp)%>%
     arrange(Event_start_UTC)#gotta be sorted
     
-
- 
+ print('driftname')
+     print(paste0(output_directory,log_file,"_",as.character(row),'.csv'))
   
     split_on_turning_point=function(row,good_info_df,output_directory,log_file){
             this_tp=good_info_df[row,]
             next_tp=good_info_df[(row+1),]
-            new_df=filter(gnss_log, gnss_time_UTC >= this_tp$Event_end_UTC & gnss_time_UTC <= next_tp$Event_start_UTC )
-     
+            new_df=filter(gnss_log, gnss_time_UTC >= this_tp$Event_end_UTC & gnss_time_UTC <= next_tp$Event_start_UTC )%>%
+                   mutate(drift_id=paste0(drift_id,"_",as.character(row)))
+        
+        if(nrow(new_df)==0){return(NA)} #shouldn't happen, but does?
             write.csv(new_df,paste0(output_directory,log_file,"_",as.character(row),'.csv'))
-        print(paste0(output_directory,log_file,"_",as.character(row),'.csv'))
+            print(paste0(output_directory,log_file,"_",as.character(row),'.csv'))
        }  
     
     

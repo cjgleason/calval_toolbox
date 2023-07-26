@@ -21,13 +21,11 @@ select_appropriate_drift=function(passname,time_threshold_sec,wse_threshold_m,di
   drift_node_index=which(!is.na(str_match(list.files(drift_node_directory),'drift_node_wse')))
   drift_node_file=list.files(drift_node_directory,full.names=TRUE)[drift_node_index]
     
-   
-  
+
+    
   drift_nodes= read.csv(drift_node_file)%>%
     mutate(time=as.numeric(as.POSIXct(time_UTC)))%>% #beacuse it is a .csv and not .rds, it loses its datetime
     mutate(time_diff_to_swot_drift_sec=abs(time-swot_time_UTC))
-    
-
   
   keep_index= which(drift_nodes$time_diff_to_swot_drift_sec<=time_threshold_sec)
   remove_index =which(drift_nodes$time_diff_to_swot_drift_sec>time_threshold_sec)
@@ -40,10 +38,12 @@ select_appropriate_drift=function(passname,time_threshold_sec,wse_threshold_m,di
   
   #write it to file
   if (nrow(direct_match_drift)>0){
-    write.csv(direct_match_drift,paste0(matched_output_directory,passname,'processdate',
-                                        str_replace_all(as.character(Sys.Date()),'\\-','_'),'.csv'))
+    write.csv(direct_match_drift,paste0(matched_output_directory,passname,'direct',
+                                        str_replace_all(as.character(Sys.Date()),'\\-','_'),'_',rivername,'.csv'),row.names=FALSE)
   }
-  
+
+
+    
   if (nrow(direct_match_drift)==nrow(drift_nodes)){
     break
     #this means they are all within some time window of swot
@@ -51,14 +51,18 @@ select_appropriate_drift=function(passname,time_threshold_sec,wse_threshold_m,di
   
   indirect_drift= drift_nodes[remove_index,]%>%
     mutate(wse=mean_node_drift_wse_m)
-  
+    
+
+   
   #get the 1hz data for those left behind
-  drift_1hz=do.call(rbind,lapply(paste0(munged_drift_directory,
-                                        unique(indirect_drift$drift_id),'.csv' ),read.csv))%>%
+  drift_1hz=do.call(rbind,lapply(unique(indirect_drift$drift_id) ,read.csv))%>%
     mutate(gnss_time_UTC=as.numeric(as.POSIXct(gnss_time_UTC)))%>%#csv read scrubs date
     mutate(Lon=gnss_Lon,Lat=gnss_Lat)
+    
+  
+ 
   #pull pt levels at swot time-----------
-  pt_at_swot_time= do.call(rbind,lapply(paste0(munged_pt_directory,list.files(munged_pt_directory)), read.csv))%>%
+  pt_at_swot_time= do.call(rbind,lapply(list.files(munged_pt_directory,full.names=TRUE), read.csv))%>%
     mutate(pt_time_UTC=as.numeric(as.POSIXct(pt_time_UTC)))%>%#csv read strips the datetime
     group_by(pt_serial)%>%
     mutate(time_diff_to_swot_pt_sec=abs(pt_time_UTC-swot_time_UTC))%>%
@@ -70,7 +74,7 @@ select_appropriate_drift=function(passname,time_threshold_sec,wse_threshold_m,di
     
     
     if(nrow(pt_at_swot_time)==0){
-    write.csv('there are no appropriate drifts for this pass',paste0(matched_output_directory,passname,'p',
+    write.csv('there are no appropriate drifts for this pass',paste0(matched_output_directory,passname,'none',
                                         str_replace_all(as.character(Sys.Date()),'\\-','_'),'_',rivername,'.csv'),row.names=FALSE)
     
         return(NA)
@@ -80,7 +84,7 @@ select_appropriate_drift=function(passname,time_threshold_sec,wse_threshold_m,di
   #do a difference join based lat/lon. Slow.
   
   #read in key df first
-  key_df=read.csv(keyfile)%>%
+  key_df=keyfile%>%
     select(PT_Serial,Node_ID,Reach_ID)%>%
     transmute(pt_serial=PT_Serial,node_id=Node_ID,reach_id=Reach_ID)
   
@@ -112,13 +116,15 @@ select_appropriate_drift=function(passname,time_threshold_sec,wse_threshold_m,di
   
   #write to file
   if(nrow(drift_pt_join_df)==0){
-    write.csv('there are no appropriate drifts for this pass',paste0(matched_output_directory,passname,'p',
+    write.csv('there are no appropriate drifts for this pass',paste0(matched_output_directory,passname,'none',
                                         str_replace_all(as.character(Sys.Date()),'\\-','_'),'_',rivername,'.csv'),row.names=FALSE)
   }else{
-  write.csv(drift_pt_join_df,paste0(matched_output_directory,passname,'p',
+  write.csv(drift_pt_join_df,paste0(matched_output_directory,passname,'matched',
                                         str_replace_all(as.character(Sys.Date()),'\\-','_'),'_',rivername,'.csv'),row.names=FALSE)
     }
   
   
+   rm(list = ls())
+    gc()
 
 }

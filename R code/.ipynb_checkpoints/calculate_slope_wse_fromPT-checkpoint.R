@@ -10,7 +10,7 @@ calculate_slope_wse_fromPT=function(keyfile,pt_files,SWORD_path,SWORD_reach,this
   library(dplyr)
 
   #read in key file
-  key_df=read.csv(keyfile)%>%
+  key_df=keyfile%>%
     transmute(pt_serial=as.integer(PT_Serial),node_id=Node_ID,reach_id=as.character(Reach_ID),us_reach_id=as.character(US_Reach_ID),ds_reach_id=as.character(DS_Reach_ID))
   #read in SWORD
   
@@ -26,6 +26,8 @@ calculate_slope_wse_fromPT=function(keyfile,pt_files,SWORD_path,SWORD_reach,this
     transmute(pt_serial,pt_time_UTC,pt_wse,pt_wse_sd)%>%
     left_join(key_df,by='pt_serial')
   
+
+    
   #calculate node wse
   node_df=pt_df%>%
     group_by(node_id,pt_time_UTC)%>%
@@ -34,6 +36,7 @@ calculate_slope_wse_fromPT=function(keyfile,pt_files,SWORD_path,SWORD_reach,this
     mutate(node_id=as.character(node_id))%>%
     distinct()#based on grouping, it will repeat
   
+ 
   #calculate reach wse
   reach_df=pt_df%>%
     group_by(reach_id,pt_time_UTC)%>%
@@ -52,8 +55,7 @@ calculate_slope_wse_fromPT=function(keyfile,pt_files,SWORD_path,SWORD_reach,this
     group_by(node_id,pt_time_UTC)%>%
     mutate(mean_pt_node = mean(pt_wse,na.rm=TRUE), sd_pt_node =sd(pt_wse,na.rm=TRUE))%>%
     ungroup()
-  
-  
+    
    us_df=filter(slope_df,node_id == upstream_node)%>%
      transmute(reach_id=reach_id,pt_time_UTC=pt_time_UTC,upstream_node=upstream_node,us_mean=mean_pt_node,us_sd=sd_pt_node)
    #if there is only a single PT in the node, we need to set the sd manually to a small number (measurement uncertainty)

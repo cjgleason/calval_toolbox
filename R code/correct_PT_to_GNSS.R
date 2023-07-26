@@ -1,6 +1,6 @@
-correct_pt_to_gnss= function(raw_pt_file,pt_key_file,dist_thresh,time_thresh,pt_data_directory,
+correct_pt_to_gnss= function(raw_pt_file,pt_key_files,dist_thresh,time_thresh,pt_data_directory,
                              gnss_drift_data_directory,QA_QC_pt_output_directory, flagged_pt_output_directory,
-                             gnss_sd_thresh,offset_sd_thresh,change_thresh_15_min){
+                             gnss_sd_thresh,offset_sd_thresh,change_thresh_15_min,pt_serial_in){
 library(dplyr)
 library(stringr)
 library(tidyr)
@@ -9,17 +9,21 @@ library(geodist)
 library(bayesbio)
 library(ncdf4)
     
-    filename=raw_pt_file
+
   
-filename=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/')[[1]])])
+
     
-  handle_raw_pt=function(raw_pt_file,pt_key_file,pt_data_directory,gnss_drift_data_directory){
+  handle_raw_pt=function(raw_pt_files,pt_key_file,pt_data_directory,gnss_drift_data_directory,pt_serial_in){
    
-           pt_serial=as.integer(read.table(paste0(pt_data_directory,raw_pt_file), header = FALSE, nrow = 1)$V1)
+           pt_serial_file=as.integer(read.table(paste0(pt_data_directory,raw_pt_file), header = FALSE, nrow = 1)$V1)
+      
+      if( (pt_serial_file %in% pt_serial_in) == FALSE ){return(NA)}
+
       
     pt_data=read.csv(paste0(pt_data_directory,raw_pt_file),skip=10,header=TRUE) %>%
       mutate(pt_serial=as.integer(pt_serial))
       
+           
       #this !@#$! field sometimes has AM/PM and sometimes 24 hour time. we need to parse it to figure out which is which and then process.
             
    sum1=sum(!is.na(str_match(pt_data$Time, 'pm')))
@@ -35,14 +39,20 @@ filename=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/'
         mutate(pt_data,datetime=as.POSIXct(paste(Date,Time),format= "%Y/%m/%d %H:%M:%S"))
       }
          
-         #print(head(pt_data))
-   
+    #now, we might have multiple key files to loop over as PTs were moved
+      #the field team decided to make multiple keys in this case, so we'll deal with that
+      #pt serials are mutulally INCLUSIVE, so we can't rbind the keyfiles
+      
+
+      
     #read in offset--------------
     keyfile=read.csv(pt_key_file,stringsAsFactors = FALSE)%>%
       mutate('driftID_install'= Final_Install_Log_File)%>%
       mutate('driftID_uninstall'= Final_Uninstall_Log_File)%>%
       mutate(pt_serial=as.integer(PT_Serial))
 
+
+      
       
     #left joining the key in 'offset' gets us a tidy data frame where the info from the key is promulgated to just that pt. a right join would give
     #an n fold expansion across n pts
@@ -51,7 +61,10 @@ filename=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/'
       mutate(pt_Lat= Lat_WGS84)%>%
       mutate(pt_Lon=Long_WGS84)%>%
       mutate(pt_time_UTC=datetime)
-  } # end pt function
+
+      
+  } # end prep function
+    
   correct_pt=function(prepped_pt,dist_thresh,time_thresh,gnss_drift_data_directory){
     
     
@@ -81,22 +94,27 @@ filename=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/'
             }else{
         string_to_match=paste(splitter[[1]][9], splitter[[1]][10],sep='_')}
 
-     
-        
-        correct_drift_index=which(!is.na(str_match(list.files(gnss_drift_data_directory),string_to_match)))
-        
-       
+       correct_drift_index=which(!is.na(str_match(list.files(gnss_drift_data_directory),string_to_match)))
+       driftstring=list.files(gnss_drift_data_directory,full.names=TRUE)[correct_drift_index]
       
-      driftstring=list.files(gnss_drift_data_directory,full.names=TRUE)[correct_drift_index]
-      
-   
-   
+    
+       #  print(gnss_drift_data_directory)
+        # print(list.files(gnss_drift_data_directory))
+        # print(string_to_match)
+        # print(correct_drift_index)
+       # print(driftstring)
+
+   read_multiple_gnss=function(driftstring){
       gnss_log=read.csv(driftstring,header=TRUE,stringsAsFactors = FALSE)%>%
         mutate(datetime=gnss_time_UTC)%>%
-        mutate(datetime=as.POSIXct(datetime))#needed as when it gets written to csv it becomes not a posix object
+        mutate(datetime=as.POSIXct(datetime)) }#needed as when it gets written to csv it becomes not a posix object
       
-      # print('gnss_log')  
-      # print(head(gnss_log))
+        #now that we split on turning points, we have multiple matches, so we need to do this
+        gnss_log=do.call(rbind,lapply(driftstring,read_multiple_gnss))
+ 
+#       print('gnss_log')  
+#       print(head(gnss_log))
+#         bonk
       #time_thresh=1000
       #half a second faster to join first on time and then on space
      
@@ -171,10 +189,24 @@ filename=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/'
     
 
     
-  }
+  } #unit pt function
   
-  #read in pt
-  prepped_pt=handle_raw_pt(raw_pt_file,pt_key_file,pt_data_directory,gnss_drift_data_directory)%>%
+handle_multi_key_files=function(pt_key_file,raw_pt_file,pt_data_directory,gnss_drift_data_directory,dist_thresh,time_thresh,gnss_sd_thresh,offset_sd_thresh){
+    
+    filename=raw_pt_file    
+    filename=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/')[[1]])])
+    filename=paste0(filename,'_',pt_key_file)
+    
+        
+
+ 
+prepped_pt=handle_raw_pt(raw_pt_file,pt_key_file,pt_data_directory,gnss_drift_data_directory)
+      #make gnss offset
+    # print(head(prepped_pt))
+  if (all(is.na(prepped_pt))){return(NA)}
+    
+    
+    prepped_pt=prepped_pt%>%
     transmute(pt_time_UTC=pt_time_UTC,pt_lat=pt_Lat,pt_lon=pt_Lon,
              
               pt_install_UTC=as.POSIXct(paste(Date_GNSS_Install,Time_GNSS_Install_Start_UTC),format= "%m/%d/%Y %H:%M"),
@@ -183,28 +215,14 @@ filename=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/'
               pt_level=Level,temperature=Temperature,driftID_install=driftID_install,driftID_uninstall=driftID_uninstall,
               datetime=datetime)
     
-    
-
-    # print(prepped_pt)
-    # print('boo')
-  
-  if(sum(is.na(prepped_pt$pt_lat))==nrow(prepped_pt)){
-    print('this pt isnt in the key')
-    saveRDS(prepped_pt,file=paste0(flagged_pt_output_directory,filename,'_',prepped_pt$pt_serial[1],'.rds'))
-    return(NA)
-  }
-    
-  #make gnss offset
+#make gnss offset
   offset_pt=correct_pt(prepped_pt,dist_thresh,time_thresh,gnss_drift_data_directory)
-
-
-    
     
   if (all(is.na(offset_pt))){
     print(filename)
     print('There are no gnss data within the space-time thresholds')
     output='There are no gnss data within the space-time thresholds'
-    saveRDS(output,file=paste0(flagged_pt_output_directory,filename,'_',prepped_pt$pt_serial[1],'.rds'))
+    write.csv(output,file=paste0(flagged_pt_output_directory,filename))
     return(NA)}
   # 
   
@@ -214,7 +232,7 @@ filename=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/'
     print('not enough data to create offset, change your thresholds or double check the data')
     output='not enough data to create offset, change your thresholds or double check the data'
     offset_pt=mutate(offset_pt,error=output)
-    saveRDS(offset_pt,file=paste0(flagged_pt_output_directory,filename,'_',offset_pt$pt_serial[1],'.rds'))
+    write.csv(offset_pt,file=paste0(flagged_pt_output_directory,filename))
     return(NA)
   }
   
@@ -227,7 +245,7 @@ filename=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/'
     noise_calc = offset_pt %>%
     mutate(date= as.Date(gnss_time_UTC))%>%
     group_by(date)%>%
-    summarize(variances=sd(gnss_wse))
+    summarize(variances=sd(gnss_wse,na.rm=TRUE))
     
   if(any(noise_calc$variances >gnss_sd_thresh  )){
     print(filename)
@@ -293,10 +311,22 @@ filename=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/'
   
   print(filename)
   print('this file passed all checks')
-  write.csv(final_pt,file=paste0(QA_QC_pt_output_directory,filename,'.csv'),row.names=FALSE)
+  write.csv(final_pt,file=paste0(QA_QC_pt_output_directory,filename),row.names=FALSE)
   
+} #end function to loop over key files
   
-}#end function 
+lapply(pt_key_files,handle_multi_key_files,
+       raw_pt_file=raw_pt_file,
+       pt_data_directory=pt_data_directory,
+       gnss_drift_data_directory=gnss_drift_data_directory,
+       dist_thresh=dist_thresh,
+       time_thresh=time_thresh,
+       gnss_sd_thresh=gnss_sd_thresh,
+       offset_sd_thresh=offset_sd_thresh)
+
+
+
+}#end toplevel function 
 
 
 
