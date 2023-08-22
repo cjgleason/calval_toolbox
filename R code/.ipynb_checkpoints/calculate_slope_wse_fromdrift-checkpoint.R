@@ -174,7 +174,7 @@ calc_node_wse=function(drift_file,node_df,cl_df,zone,photo_path){
     group_by(node_id)%>%
     filter(cl_id == min(cl_id) | cl_id == max(cl_id)) %>%
     mutate(node_angle= atan((cl_UTM_y[cl_id == min(cl_id)]-cl_UTM_y[cl_id == max(cl_id)])/(cl_UTM_x[cl_id == min(cl_id)]-cl_UTM_x[cl_id == max(cl_id)])))%>%
-    select(-geometry)%>%
+    dplyr::select(-geometry)%>%
     #make a polygon geometry- 4 points, with the first point repeated for 5 total points
     mutate(point1_x= node_UTM_x+cos(node_angle)*node_length/2, 
            point1_y= node_UTM_y+sin(node_angle)*node_length/2,
@@ -452,7 +452,7 @@ node_wses=do.call(rbind,lapply(drifts,calc_node_wse,node_df=node_df,cl_df=cl_df,
   mutate(node_id=format(node_id,scientific=FALSE))%>%
   mutate(geometry= geometry.x)%>%
   as.data.frame()%>%
-  select(-geometry.x,-geometry.y,-poly_list)
+  dplyr::select(-geometry.x,-geometry.y,-poly_list)
 
  # driftno=core_count
 
@@ -462,17 +462,17 @@ node_wses=do.call(rbind,lapply(drifts,calc_node_wse,node_df=node_df,cl_df=cl_df,
 #   mutate(node_id=format(node_id,scientific=FALSE))%>%
 #   mutate(geometry= geometry.x)%>%
 #   as.data.frame()%>%
-#   select(-geometry.x,-geometry.y,-poly_list)
+#   dplyr::select(-geometry.x,-geometry.y,-poly_list)
 
 node_geom=as.data.frame(node_wses)%>%
-  select(node_id,node_box_x_min,node_box_x_max,node_box_y_min,node_box_y_max,geometry)
+  dplyr::select(node_id,node_box_x_min,node_box_x_max,node_box_y_min,node_box_y_max,geometry)
 
     
     
 node_wses=as.data.frame(node_wses)%>% transmute(time_UTC=time,node_id=node_id,drift_id=drift_id,mean_node_drift_wse_m=node_wse,mean_node_drift_wse_precision_m=node_wse_precision_m,ellipsoid_height_m=node_height_above_ellipsoid)
 
 reach_geom=as.data.frame(spatial_reach)%>%
-  select(reach_id,geometry)
+  dplyr::select(reach_id,geometry)
 
     
       

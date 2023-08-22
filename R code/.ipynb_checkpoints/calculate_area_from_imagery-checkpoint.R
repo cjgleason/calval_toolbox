@@ -1,9 +1,4 @@
-### Created on Nov 1, 2022 by Fangfang Yao (fangfang.yao@colorado.edu) ###
-###Purpose: delineating water masks and calculating reach/node water areas for SWOT rivers using Pleiades images
-#
-#
-###########
-#utm_zone (based on imagery)
+
 
 
 calculate_area_from_imagery=function(image,

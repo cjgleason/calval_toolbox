@@ -68,7 +68,7 @@ select_appropriate_drift=function(passname,time_threshold_sec,wse_threshold_m,di
     mutate(time_diff_to_swot_pt_sec=abs(pt_time_UTC-swot_time_UTC))%>%
     filter(time_diff_to_swot_pt_sec==min(time_diff_to_swot_pt_sec))%>%
     ungroup()%>%
-    select(-driftID_install,-driftID_uninstall)%>%#this was the drift used to correct it, but that is confusing here
+    dplyr::select(-driftID_install,-driftID_uninstall)%>%#this was the drift used to correct it, but that is confusing here
     mutate(Lat=pt_lat,Lon=pt_lon) %>%
     filter(time_diff_to_swot_pt_sec<=time_threshold_sec)
     
@@ -85,7 +85,7 @@ select_appropriate_drift=function(passname,time_threshold_sec,wse_threshold_m,di
   
   #read in key df first
   key_df=keyfile%>%
-    select(PT_Serial,Node_ID,Reach_ID)%>%
+    dplyr::select(PT_Serial,Node_ID,Reach_ID)%>%
     transmute(pt_serial=PT_Serial,node_id=Node_ID,reach_id=Reach_ID)
   
   

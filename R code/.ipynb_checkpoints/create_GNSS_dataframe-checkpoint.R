@@ -31,10 +31,11 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
   
 
 
+
   Info_df=data.frame(Event_code=Info_event, Event_start= Info_event_start, Event_end=Info_event_end)%>%
     mutate(Event_start_UTC = as.POSIXct(Event_start ,origin='2000-01-01 00:00:00',tz='UTC'))%>% 
     mutate(Event_end_UTC = as.POSIXct(Event_end ,origin='2000-01-01 00:00:00',tz='UTC' ))%>%
-    select(-Event_end,-Event_start)%>%
+    dplyr::select(-Event_end,-Event_start)%>%
     #add 1 minutes to the event codes
     mutate(Event_start_UTC=Event_start_UTC-1*60)%>%
      mutate(Event_end_UTC=Event_end_UTC+1*60)%>%
@@ -46,7 +47,6 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
            Event_code == 'tp' | Event_code == 'TP' ~'TP'))%>%
     filter(!is.na(Event_code))
     
-
 
   gnss_log=data.frame(gnss_Lat=Lat,gnss_Lon=Lon,gnss_wse=gnss_wse,gnss_time_tai=gnss_time_tai,gnss_uncertainty_m=gnss_uncertainty,
                       gnss_surf_flag=gnss_surf_flag,gnss_motion_flag=gnss_motion_flag, height_above_ellipsoid= height_above_ellipsoid)%>%

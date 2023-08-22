@@ -49,7 +49,7 @@ calculate_slope_wse_fromPT=function(keyfile,pt_files,SWORD_path,SWORD_reach,this
   unique_reaches=unique(pt_df$reach_id)
   
   slope_df= pt_df%>%
-    select(-us_reach_id,-ds_reach_id)%>%
+    dplyr::select(-us_reach_id,-ds_reach_id)%>%
     group_by(reach_id)%>%
     mutate(upstream_node=max(node_id),downstream_node=min(node_id))%>%
     group_by(node_id,pt_time_UTC)%>%
@@ -66,7 +66,7 @@ calculate_slope_wse_fromPT=function(keyfile,pt_files,SWORD_path,SWORD_reach,this
    ds_df$ds_sd[is.na(ds_df$ds_sd)]= measurement_error
    
   slope_df2=slope_df%>%
-    select(-mean_pt_node,-sd_pt_node)%>%
+    dplyr::select(-mean_pt_node,-sd_pt_node)%>%
     left_join(us_df,by=c('reach_id','pt_time_UTC','upstream_node'))%>%
     left_join(ds_df,by=c('reach_id','pt_time_UTC','downstream_node'))%>%
     left_join(reach_length_df,by='reach_id')%>%
@@ -74,7 +74,7 @@ calculate_slope_wse_fromPT=function(keyfile,pt_files,SWORD_path,SWORD_reach,this
     mutate(slope_m_m= (us_mean- ds_mean)/reach_length, slope_uncertainty_m_m = (us_sd^2+ds_sd^2+alongstream_error^2 + measurement_error^2 + crossstream_error)/reach_length)%>%
     filter(!is.na(slope_m_m))%>%
     distinct()%>%
-    select(-reach_length,-pt_wse_sd,-pt_wse,-pt_serial,-node_id)
+    dplyr::select(-reach_length,-pt_wse_sd,-pt_wse,-pt_serial,-node_id)
  
  
   # print(paste0(output_directory,'reach/',rivername,'_','PT_reach_slope.csv'))

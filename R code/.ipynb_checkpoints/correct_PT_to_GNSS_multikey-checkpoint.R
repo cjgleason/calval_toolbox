@@ -16,6 +16,8 @@ library(ncdf4)
       mutate('driftID_install'= sub("\\..*","",Final_Install_Log_File))%>%
       mutate('driftID_uninstall'= sub("\\..*","",Final_Uninstall_Log_File))%>%
       mutate(pt_serial=as.integer(PT_Serial))
+    
+ 
 
     #check for a serial match-----------
     if( pt_serial_file %in% keyfile$pt_serial == FALSE){return(NA)}
@@ -65,8 +67,10 @@ library(ncdf4)
       filter(pt_serial==pt_serial_file)%>% #limit to just the PT we want. The filter above should take care 
     #of the case where the serial is not in the key file
     transmute(pt_time_UTC=pt_time_UTC,pt_lat=pt_Lat,pt_lon=pt_Lon,
-     pt_install_UTC=as.POSIXct(paste(Date_GNSS_Install,Time_GNSS_Install_Start_UTC),format= "%m/%d/%Y %H:%M"),
-     pt_uninstall_UTC=as.POSIXct(paste(Date_GNSS_Uninstall,Time_GNSS_Uninstall_End_UTC),format= "%m/%d/%Y %H:%M"),
+     pt_install_UTC=as.POSIXct(paste(Date_PT_Install,Time_PT_Install_UTC),format= "%m/%d/%Y %H:%M"),
+     pt_uninstall_UTC=as.POSIXct(paste(Date_PT_Uninstall,Time_PT_Uninstall_UTC),format= "%m/%d/%Y %H:%M"),
+                   gnss_install_UTC=as.POSIXct(paste(Date_GNSS_Install,Time_GNSS_Install_Start_UTC),format= "%m/%d/%Y %H:%M"),
+     gnss_uninstall_UTC=as.POSIXct(paste(Date_GNSS_Uninstall,Time_GNSS_Uninstall_End_UTC),format= "%m/%d/%Y %H:%M"),
          install_method=Install_method, pt_serial=pt_serial,         
          pt_level=Level,temperature=Temperature,
               driftID_install=driftID_install,driftID_uninstall=driftID_uninstall,
@@ -150,6 +154,10 @@ getit_positive=function(longstring, shortstrings){
                   gnss_lat=gnss_Lat, gnss_lon=gnss_Lon, pt_lat=pt_lat, pt_lon=pt_lon,
               gnss_pt_dist_m=distance_m ,keyid=keyid, pt_install_UTC=pt_install_UTC,
              pt_uninstall_UTC=pt_uninstall_UTC)
+    
+    
+    #if we want to filter to just times covered by the install and uninstall, we'd do so with 
+    #a pipe here. Currently not doing that as we want to check in the middle for changes.
       
       #next, ensure there are enough gnss points to make a valid offset correction
       if(nrow(clean_pt)==0){
@@ -256,24 +264,25 @@ check_data_frames=function(wse_pt,pt_data,filename_base){
           #bayesbio has a nice nearest time join!
 
           #first strip the offset df into just the gnss time and the pt correction and SD
-          svelte_offset_pt=select(offset_pt,pt_correction,pt_wse_sd,gnss_time_UTC)
+          svelte_offset_pt=dplyr::select(offset_pt,pt_correction,pt_wse_sd,gnss_time_UTC)
     
           #need the OG pt data
 
  
+    # in this case we want all the data from when the PT was in the water. 
     prepped_pt2=pt_data
   if(!all(is.na(unique(pt_data$pt_install_UTC)))){
           prepped_pt2= prepped_pt2 %>%
             mutate(timediff_install=pt_install_UTC-pt_time_UTC)%>%
             filter(timediff_install<0)%>%
-            select(-timediff_install)}
+            dplyr::select(-timediff_install)}
      
   if(!all(is.na(unique(pt_data$pt_uninstall_UTC)))){
            # drop pt data after uninstall time
             prepped_pt2= prepped_pt2 %>%
             mutate(timediff_uninstall=pt_uninstall_UTC-pt_time_UTC)%>%
             filter(timediff_uninstall>0)%>%
-            select(-timediff_uninstall)}
+            dplyr::select(-timediff_uninstall)}
     
 
     
@@ -286,7 +295,7 @@ check_data_frames=function(wse_pt,pt_data,filename_base){
 
           final_pt=cbind(svelte_offset_pt[pt_index,],prepped_pt2)%>%
             mutate(pt_wse=pt_level+pt_correction)%>%
-            select(-datetime)
+            dplyr::select(-datetime)
 
 
           print(filename)

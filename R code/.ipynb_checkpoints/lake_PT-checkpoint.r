@@ -53,7 +53,15 @@ library(ncdf4)
       left_join(keyfile,by='pt_serial')%>%
       mutate(pt_Lat= Lat_WGS84)%>%
       mutate(pt_Lon=Long_WGS84)%>%
-      mutate(pt_time_UTC=datetime)
+      mutate(pt_time_UTC=datetime)%>%
+      mutate(pt_install_UTC=as.POSIXct(paste(Date_GNSS_Install,Time_GNSS_Install_Start_UTC),format= "%m/%d/%Y %H:%M"))%>%
+      mutate(pt_uninstall_UTC=as.POSIXct(paste(Date_GNSS_Uninstall,Time_GNSS_Uninstall_End_UTC),format= "%m/%d/%Y %H:%M"))%>%
+    mutate(timediff_install=pt_install_UTC-pt_time_UTC)%>%
+    filter(timediff_install<0)%>%
+    #drop pt data after uninstall time
+    mutate(timediff_uninstall=pt_uninstall_UTC-pt_time_UTC)%>%
+    filter(timediff_uninstall>0)%>%
+    select(-timediff_install,-timediff_uninstall)
       
    
   #print(head(pt_data))
@@ -148,6 +156,7 @@ unit_pt_process = function(log_file,prepped_pt,dist_thresh,time_thresh,gnss_drif
       #now, multiple gnss points go to one pt. Need to group by pt timestep and apply the correction at that level
       #the differences in these offsets is the uncertainty of this mapping
       
+    #in this case the pt install time above corresponds to the gnss install and uninstall date. any pt data collected before or after the gnss was in the water will not be used for the offset.
       
       offset_pt_mean=clean_pt%>%
         group_by(pt_time_UTC)%>%
@@ -188,14 +197,14 @@ unit_pt_process = function(log_file,prepped_pt,dist_thresh,time_thresh,gnss_drif
     filter(!is.na(pt_level)) #handle that edge case
 
     
-  }
+  } #end the correct PT function
   
 
   #read in pt
   prepped_pt=handle_raw_pt(raw_pt_file,pt_key_file,pt_data_directory)%>%
     transmute(pt_time_UTC=pt_time_UTC,pt_lat=pt_Lat,pt_lon=pt_Lon,
-              pt_install_UTC=as.POSIXct(paste(Date_GNSS_Install,Time_GNSS_Install_Start_UTC),format= "%m/%d/%Y %H:%M"),
-              pt_uninstall_UTC=as.POSIXct(paste(Date_GNSS_Uninstall,Time_GNSS_Uninstall_End_UTC),format= "%m/%d/%Y %H:%M"),
+              pt_install_UTC=pt_install_UTC,
+              pt_uninstall_UTC=pt_uninstall_UTC,
               install_method=Install_method, pt_serial=pt_serial,
               pt_level=Level,temperature=Temperature,driftID_install=driftID_install,driftID_uninstall=driftID_uninstall,
               datetime=datetime)
@@ -279,13 +288,13 @@ unit_pt_process = function(log_file,prepped_pt,dist_thresh,time_thresh,gnss_drif
   #     write.csv(prepped_pt,'/nas/cee-water/cjgleason/calval/Processed data/CU/Munged PT/prepped.csv')
   
 
-  prepped_pt2=prepped_pt %>%
-    mutate(timediff_install=pt_install_UTC-pt_time_UTC)%>%
-    filter(timediff_install<0)%>%
-    #drop pt data after uninstall time
-    mutate(timediff_uninstall=pt_uninstall_UTC-pt_time_UTC)%>%
-    filter(timediff_uninstall>0)%>%
-    select(-timediff_install,-timediff_uninstall)
+#   prepped_pt2=prepped_pt %>%
+#     mutate(timediff_install=pt_install_UTC-pt_time_UTC)%>%
+#     filter(timediff_install<0)%>%
+#     #drop pt data after uninstall time
+#     mutate(timediff_uninstall=pt_uninstall_UTC-pt_time_UTC)%>%
+#     filter(timediff_uninstall>0)%>%
+#     select(-timediff_install,-timediff_uninstall)
     
   
   findmintime=function(prepped_pt_row,gnss_times){
@@ -295,9 +304,9 @@ unit_pt_process = function(log_file,prepped_pt,dist_thresh,time_thresh,gnss_drif
    }
   
   
-  pt_index=apply(prepped_pt2,1, findmintime, gnss_times=svelte_offset_pt$gnss_time_UTC)
+  pt_index=apply(prepped_pt,1, findmintime, gnss_times=svelte_offset_pt$gnss_time_UTC)
   
-  final_pt=cbind(svelte_offset_pt[pt_index,],prepped_pt2)%>%
+  final_pt=cbind(svelte_offset_pt[pt_index,],prepped_pt)%>%
     mutate(pt_wse=pt_level+pt_correction)%>%
     select(-datetime)
   
