@@ -124,6 +124,9 @@ if (nrow(bad_info_df)>0){
   }
   
 if (nrow(good_info_df)==0){
+    gnss_log=gnss_log%>%
+        mutate(drift_id=paste0(drift_id,"_1"))
+    
     write.csv(gnss_log,paste0(output_directory,log_file,"_",as.character(1),'.csv'))
     nc_close(gnss_nc)
     return(NA)
@@ -137,8 +140,8 @@ if (nrow(good_info_df)==0){
     good_info_df=rbind(start_tp,good_info_df,end_tp)%>%
     arrange(Event_start_UTC)#gotta be sorted
     
- print('driftname')
-     print(paste0(output_directory,log_file,"_",as.character(row),'.csv'))
+ # print('driftname')
+  
   
     split_on_turning_point=function(row,good_info_df,output_directory,log_file){
             this_tp=good_info_df[row,]
