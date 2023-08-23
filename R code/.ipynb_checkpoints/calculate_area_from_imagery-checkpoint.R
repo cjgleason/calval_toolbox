@@ -175,7 +175,9 @@ spatial_reach=spatial_reach%>%
 spatial_reach=st_as_sf(spatial_reach,sf_column_name='geometry')
 st_crs(spatial_reach)= paste0('+proj=utm +zone=',utm_zone,' +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs')
 
-
+   
+  
+print(image)
 
 # #read in image 
 image_in=raster(image)
@@ -189,21 +191,29 @@ ycell=res(buffered_cl_image)[2]
     
 
     
-node_table=data.frame(node_area=unlist(lapply(extract(buffered_cl_image, spatial_node),sum,na.rm=T)),node_id=spatial_node$node_id)%>%
-    mutate(node_area_m2=node_area*xcell*ycell)
+node_table=data.frame(node_area_pixels=unlist(lapply(extract(buffered_cl_image, spatial_node),sum,na.rm=T)),node_id=spatial_node$node_id)%>%
+    mutate(node_area_m2=node_area_pixels*xcell*ycell)%>%
+    left_join(node_df,by='node_id')%>%
+    mutate(node_effective_width_m=node_area_m2/node_length)
 
-reach_table=data.frame(reach_area=unlist(lapply(extract(buffered_cl_image, spatial_reach),sum,na.rm=T)),reach_id=spatial_reach$reach_id)%>%
-    mutate(reach_area_m2=reach_area*xcell*ycell)    
+reach_table=data.frame(reach_area_pixels=unlist(lapply(extract(buffered_cl_image, spatial_reach),sum,na.rm=T)),reach_id=spatial_reach$reach_id)%>%
+    mutate(reach_area_m2=reach_area_pixels*xcell*ycell)%>%
+    left_join(reach_df,by='reach_id')%>%
+    mutate(node_effective_width_m=reach_area_m2/reach_length)
     
     image_name=substr(sub('.*\\/', '', image),1,nchar(sub('.*\\/', '', image))-4)
 
 write.csv(node_table,paste0(dir_output,rivername,'_',image_name,'_node_areas.csv'),row.names=FALSE)
 write.csv(reach_table,paste0(dir_output,rivername,'_',image_name,'_reach_areas.csv'),row.names=FALSE)
-
-    
-
+  
+write.csv(spatial_node$poly_list,
+          paste0(dir_output,rivername,'_',image_name,'_node_geom.csv'),append=FALSE,row.names=FALSE)
+write.csv(spatial_reach$geometry,
+          paste0(dir_output,rivername,'_',image_name,'_reach_geom.csv'),append=FALSE,row.names=FALSE)
+write.csv( paste0('+proj=utm +zone=',utm_zone,' +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs'),
+          paste0(dir_output,rivername,'_',image_name,'_CRS.csv'),append=FALSE,row.names=FALSE)
+  
     } #end total function
-
 
 
 

@@ -13,7 +13,7 @@ toolbox_main_batch=function(hubname,
                            offset_sd_thresh,
                            change_thresh_15_min,
                            alongstream_error,
-                           crosstream_error,
+                           crossstream_error,
                            measurement_error, 
                             time_threshold_sec_match,
                             wse_threshold_m_match,
@@ -110,6 +110,7 @@ print(image_directory)
     
  #create dataframes from drifts---------------------------------------------------------
 #pull filename before the .csv
+    print('starting drift munging')
 source('/nas/cee-water/cjgleason/calval_toolbox/R code/create_GNSS_dataframe.R')
 raw_GNSS=sub( "\\..*","", list.files(GNSS_drift_data_directory,recursive=TRUE))
 raw_GNSS_river=which(!is.na(do.call(rbind,lapply(raw_GNSS,str_match,rivername))))
@@ -149,13 +150,14 @@ create_gnss_dataframe(unmunged_drifts[i],
 #                   output_directory=QA_QC_drift_output_directory)
 #   stopCluster(cl)
 
-
+print('ending drift munging')
 #-------------------------------------------------   
     
     
 #munge PTs if needed------
 source('/nas/cee-water/cjgleason/calval_toolbox/R code/correct_PT_to_GNSS_multikey.R')
 if (process_PTs==1){
+    print('starting PT munging')
 # dist_thresh=150 # 150m
 # time_thresh= 15*60 #minutes as seconds, centered, so 15 =30 mins total time
 # GNSS_sd_thresh=0.15 # 15cm how much variance do you want in the GNSS data when it is within the distance threshold?
@@ -225,12 +227,28 @@ in_key_unprocessed=unprocessed_files[do.call(rbind,lapply(unprocessed_files,geti
 # print(in_key_unprocessed)
 
     
-for(thisone in in_key_unprocessed){
+# for(thisone in in_key_unprocessed){
 
-        correct_pt_to_gnss_multikey(thisone,
-                  master_key=master_key,
-                  dist_thresh=dist_thresh_offset,
-                  time_thresh=time_thresh_offset,
+#         correct_pt_to_gnss_multikey(thisone,
+#                   master_key=master_key,
+#                   dist_thresh=dist_thresh_offset,
+#                   time_thresh=time_thresh_offset,
+#                   pt_data_directory=PT_data_directory,
+#                   gnss_drift_data_directory=QA_QC_drift_output_directory,
+#                   QA_QC_pt_output_directory=QA_QC_PT_output_directory,
+#                   flagged_pt_output_directory=flagged_PT_output_directory,
+#                   gnss_sd_thresh=GNSS_sd_thresh,
+#                   offset_sd_thresh=offset_sd_thresh,
+#                   change_thresh_15_min=change_thresh_15_min) 
+# }
+    
+    
+    
+      cl=makeCluster(40,type='FORK')
+  dummy=parLapply(cl, in_key_unprocessed,correct_pt_to_gnss_multikey,
+                   master_key=master_key,
+                  dist_thresh=dist_thresh,
+                  time_thresh=time_thresh,
                   pt_data_directory=PT_data_directory,
                   gnss_drift_data_directory=QA_QC_drift_output_directory,
                   QA_QC_pt_output_directory=QA_QC_PT_output_directory,
@@ -238,33 +256,17 @@ for(thisone in in_key_unprocessed){
                   gnss_sd_thresh=GNSS_sd_thresh,
                   offset_sd_thresh=offset_sd_thresh,
                   change_thresh_15_min=change_thresh_15_min) 
-}
+  stopCluster(cl)
     
     
-    
-#       cl=makeCluster(20,type='FORK')
-#   dummy=parLapply(cl, in_key_unprocessed,correct_pt_to_gnss_multikey,
-#                    master_key=master_key,
-                  # dist_thresh=dist_thresh,
-                  # time_thresh=time_thresh,
-                  # pt_data_directory=PT_data_directory,
-                  # gnss_drift_data_directory=QA_QC_drift_output_directory,
-                  # QA_QC_pt_output_directory=QA_QC_PT_output_directory,
-                  # flagged_pt_output_directory=flagged_PT_output_directory,
-                  # gnss_sd_thresh=GNSS_sd_thresh,
-                  # offset_sd_thresh=offset_sd_thresh,
-                  # change_thresh_15_min=change_thresh_15_min) 
-#   stopCluster(cl)
-    
-    
-    
+    print('ending PT processing')
     
     }#end if process PT
  
     
     
   #calculate slopes and heights from drifts within nodes and reaches------
-
+print('starting drift dataframe creation')
 SWORD_reach= read.csv(domain_file)
 this_river_reach_IDs= as.numeric(unique(SWORD_reach$Reach_ID[!is.na(SWORD_reach$Reach_ID)]))
 this_river_node_IDs= as.numeric(unique(SWORD_reach$Node_ID[!is.na(SWORD_reach$Node_ID)]))
@@ -286,13 +288,15 @@ dummy=calculate_slope_wse_fromdrift(SWORD_path=SWORD_path,
                                     core_count=core_count)
     
     
-
+print('ending drift dataframe creation')
 
 #end calculate slopes and heights from drifts
     
     
     #calculate slopes and heights from PTs within nodes and reaches----
 if (process_PTs==1){
+    
+    print('starting pt dataframe creation')
 PT_files=paste0(QA_QC_PT_output_directory,list.files(QA_QC_PT_output_directory))
 SWORD_reach= read.csv(domain_file)
 this_river_reach_IDs= as.numeric(as.character(unique(SWORD_reach$Reach_ID)))
@@ -322,7 +326,9 @@ dummy=calculate_slope_wse_fromPT(keyfile=master_key,
                                  alongstream_error=alongstream_error,
                                  crossstream_error=crossstream_error,
                                  measurement_error=measurement_error)
-     }
+print('ending pt dataframe creation')     
+
+}
 #end calculates slopes and heights from PTs-----------------------------
     
     
@@ -331,6 +337,7 @@ dummy=calculate_slope_wse_fromPT(keyfile=master_key,
 #SWOT_L2_HR_RiverSP_<FileIdentifier>_<CycleID>_<PassID>_<ContinentID>_<RangeBeginningDateTime>_<RangeEndingDateTime>_<CRID>_<ProductCounter>.<extension> 
 
 if (process_PTs ==1){
+    print('starting matching')
 passfile=paste0('/nas/cee-water/cjgleason/calval/Processed data/riversp_list_clean_',rivername,'_20230726.txt')
 
  
@@ -389,7 +396,7 @@ for (i in 1:length(passnames)){
 #                                rivername=rivername)
 
 #  stopCluster(cl)
-    
+    print('ending matching')
     }
     
 # end matching-----------------------------
@@ -398,6 +405,7 @@ for (i in 1:length(passnames)){
     #calcluate areas from images------------------
 if (process_airborne ==1){
 
+    print('starting area dataframes')
 a=Sys.time()
 
 library(parallel)
@@ -442,6 +450,7 @@ stopCluster(cl)
     
  print(Sys.time()-a)#calcluate areas from images----
 
+    print('ending area dataframes')
  }
 
     

@@ -14,4 +14,8 @@ netcdf
 SWORD_v14_nc.zip
 na_sword_v14.nc
 .DS_Store
+_rslurm_Brown
+_rslurm_UNC
+_rslurm_UMass
+_rslurm_CU
 .RHistory
