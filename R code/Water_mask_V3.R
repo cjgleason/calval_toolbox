@@ -1,7 +1,6 @@
-### Created on Nov 1, 2022 by Fangfang Yao (fangfang.yao@colorado.edu) ###
-###Purpose: delineating water masks and calculating reach/node water areas for SWOT rivers using Pleiades images
-#
-#
+#deprecated. We now use pre made masks from CNES. 9/23
+
+
 ###########
 # load library 
 library(raster,quietly = TRUE,warn.conflicts=FALSE)

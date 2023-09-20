@@ -4,6 +4,7 @@ lake_PT=function(raw_pt_file,pt_key_file,pt_data_directory,
                 flagged_pt_output_directory,
                      gnss_sd_thresh,offset_sd_thresh,change_thresh_15_min){
 
+    #create WSE in lakes from PTs and GNSS
 
 library(dplyr)
 library(stringr)

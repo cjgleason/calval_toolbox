@@ -1,3 +1,6 @@
+#matches drifts to SWOT when SWOT and the drift are not coincident.
+#in fact, first checks for coincidence
+
 
 select_appropriate_drift=function(passname,time_threshold_sec,wse_threshold_m,distance_threshold_m,keyfile,
                                   drift_node_directory,matched_output_directory,munged_drift_directory,munged_pt_directory,

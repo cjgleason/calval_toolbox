@@ -10,7 +10,7 @@ library(bayesbio)
 library(ncdf4)
     
 
-  
+  #deprecated. DO NOT USE as of 9/2023
 
     
   handle_raw_pt=function(raw_pt_files,pt_key_file,pt_data_directory,gnss_drift_data_directory,pt_serial_in){

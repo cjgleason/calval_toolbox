@@ -3,6 +3,7 @@ create_lake_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_d
   library(stringr)
   library(dplyr)
   
+    #create GNSS files for lakes
 
   gnss_nc=nc_open(paste0(gnss_drift_data_directory,log_file,'.nc'))
   # variables we need

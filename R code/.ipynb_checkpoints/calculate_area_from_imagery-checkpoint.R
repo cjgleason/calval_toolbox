@@ -1,4 +1,4 @@
-
+# to be replaced by river obs on the JPL side starting sep 2023
 
 
 calculate_area_from_imagery=function(image,
@@ -103,11 +103,11 @@ node_cls=node_df%>%
 
 make_polys= function(node_df){
   
-  polygon_list= st_polygon( list(rbind(c(node_df['point1_x'],node_df['point1_y']),
-                                       c(node_df['point2_x'],node_df['point2_y']),
-                                       c(node_df['point3_x'],node_df['point3_y']),
-                                       c(node_df['point4_x'],node_df['point4_y']),
-                                       c(node_df['point1_x'],node_df['point1_y']) )))
+  polygon_list= st_polygon( list(rbind(c(node_df['point1_x'],node_df['point4_y']),
+                                       c(node_df['point2_x'],node_df['point3_y']),
+                                       c(node_df['point3_x'],node_df['point2_y']),
+                                       c(node_df['point4_x'],node_df['point1_y']),
+                                       c(node_df['point1_x'],node_df['point4_y']) )))
   
 }
 
@@ -160,7 +160,6 @@ spatial_reach=spatial_reach%>%
 
 make_reach_polys=function(spatial_reach){
   reach_polygon_list= st_polygon( list(rbind(c(spatial_reach['xmin'],spatial_reach['ymin']),
-                                             
                                              c(spatial_reach['xmin'],spatial_reach['ymax']),
                                              c(spatial_reach['xmax'],spatial_reach['ymax']),
                                              c(spatial_reach['xmax'],spatial_reach['ymin']),
@@ -175,7 +174,6 @@ spatial_reach=spatial_reach%>%
 spatial_reach=st_as_sf(spatial_reach,sf_column_name='geometry')
 st_crs(spatial_reach)= paste0('+proj=utm +zone=',utm_zone,' +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs')
 
-   
   
 print(image)
 
@@ -189,17 +187,17 @@ buffered_cl_image=mask(crop(image_in,clbuffer),clbuffer)
 xcell=res(buffered_cl_image)[1]
 ycell=res(buffered_cl_image)[2]
     
-
-    
 node_table=data.frame(node_area_pixels=unlist(lapply(extract(buffered_cl_image, spatial_node),sum,na.rm=T)),node_id=spatial_node$node_id)%>%
     mutate(node_area_m2=node_area_pixels*xcell*ycell)%>%
     left_join(node_df,by='node_id')%>%
-    mutate(node_effective_width_m=node_area_m2/node_length)
+    mutate(node_effective_width_m=node_area_m2/node_length)%>%
+    distinct()
 
 reach_table=data.frame(reach_area_pixels=unlist(lapply(extract(buffered_cl_image, spatial_reach),sum,na.rm=T)),reach_id=spatial_reach$reach_id)%>%
     mutate(reach_area_m2=reach_area_pixels*xcell*ycell)%>%
     left_join(reach_df,by='reach_id')%>%
-    mutate(node_effective_width_m=reach_area_m2/reach_length)
+    mutate(node_effective_width_m=reach_area_m2/reach_length)%>%
+    distinct()
     
     image_name=substr(sub('.*\\/', '', image),1,nchar(sub('.*\\/', '', image))-4)
 

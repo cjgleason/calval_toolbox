@@ -3,7 +3,7 @@ calculate_slope_wse_fromdrift=function(SWORD_path,drift_directory,PT_directory,o
   
     suppressWarnings({
 
-
+#this code creates sword products from drifts
 
   library(sf)
   library(dplyr)
@@ -380,10 +380,14 @@ calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river
   slope_start_elevations= drift_in[slope_start_index,]$gnss_wse
   slope_end_elevations= drift_in[slope_end_index,]$gnss_wse
   
-  slope= (mean(slope_start_elevations)- mean(slope_end_elevations)) / cl_distance
+      #this convention results in a negative slope, so swithing the start and end here to make a positive number
+  slope= (mean(slope_end_elevations)- mean(slope_start_elevations)) / cl_distance
   slope_sd= (sqrt(sd(slope_start_elevations)^2+sd(slope_end_elevations)^2)) / cl_distance
 
+      
+      
   if (is.na(slope_sd)){reach_wse_bar_m=NA}#kluge that tells us the whole reach wasn't floated
+  
     
 
  
@@ -429,7 +433,7 @@ calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river
 }
 #------------------------------------------------------
 
-
+print(paste0(output_directory,'node/',rivername,'_drift_node_wses.csv'))
 
 if(reprocess_switch ==0){
     existing_node_df=read.csv(paste0(output_directory,'node/',rivername,'_drift_node_wses.csv'))
@@ -475,7 +479,6 @@ reach_geom=as.data.frame(spatial_reach)%>%
   dplyr::select(reach_id,geometry)
 
     
-      
     
 
 reach_stats=do.call(rbind,lapply(drifts,calc_reach_stats,spatial_reach=spatial_reach,              buffer=buffer,cl_df=cl_df,zone=utm_zone,this_river_reach_ids=this_river_reach_ids))%>%
@@ -483,13 +486,12 @@ reach_stats=do.call(rbind,lapply(drifts,calc_reach_stats,spatial_reach=spatial_r
   filter(!is.na(slope_precision))%>% transmute(reach_id=reach_id,mean_reach_drift_wse_m=wse_bar,mean_reach_drift_wse_precision_m=wse_precision,wse_drift_start_UTC=wse_start,wse_drift_end_UTC=wse_end, reach_drift_slope_m_m=slope,reach_drift_slope_precision_m=slope_precision,drift_id=drift_id,ellipsoid_height_m=ellipsoid_height)
     
     
-
 # reach_stats=calc_reach_stats(drifts[driftno],spatial_reach=spatial_reach,              buffer=buffer,cl_df=cl_df,zone=utm_zone,this_river_reach_ids=this_river_reach_ids)%>%
 #   mutate(reach_id=format(reach_id,scientific = FALSE))%>%
 #   filter(!is.na(slope_precision))%>% transmute(reach_id=reach_id,mean_reach_drift_wse_m=wse_bar,mean_reach_drift_wse_precision_m=wse_precision,wse_drift_start_UTC=wse_start,wse_drift_end_UTC=wse_end, reach_drift_slope_m_m=slope,reach_drift_slope_precision_m=slope_precision,drift_id=drift_id,ellipsoid_height_m=ellipsoid_height)
      # stopCluster(CLUSTER)
          
-        
+        print(paste0(output_directory,'/reach/',rivername,'_drift_reach_wse_slope.csv'))
 
     if(reprocess_switch ==1){
 write.csv(node_geom,paste0(output_directory,'/node/',rivername,'_drift_node_geom.csv'),append=FALSE,row.names=FALSE)

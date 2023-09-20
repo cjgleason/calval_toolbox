@@ -1,7 +1,6 @@
-### Created on Nov 1, 2022 by Fangfang Yao (fangfang.yao@colorado.edu) ###
-###Purpose: delineating water masks and calculating reach/node water areas for SWOT rivers using Pleiades images
-#
-#
+#deprecated. We now use pre made masks from CNES. 9/23
+
+
 ###########
 # load library 
 library(raster,quietly = TRUE,warn.conflicts=FALSE)
@@ -193,7 +192,7 @@ for (eachnode in this_river_node_IDs) {
   
   # read ROI shapefile
   Node_ROI = readOGR(paste0(dir_output_ROI,'/','NodeID_',eachnode,'_ROI.shp'), layer = paste0('NodeID_',eachnode,'_ROI'))
-  # reproject ROI to image projection (not necessary if the projections are the same)
+  # reproject ROI to image projection (not neceswatesary if the projections are the same)
   Node_ROI = spTransform(Node_ROI, crs(Pleiades_image))
   
   Imagefilename = basename(Inputimagefile)

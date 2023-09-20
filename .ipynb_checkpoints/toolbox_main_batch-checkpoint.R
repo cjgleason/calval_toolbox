@@ -1,3 +1,5 @@
+#function that replaces the notebook with a batchable version
+
 toolbox_main_batch=function(hubname,
                             rivername,
                             continent,
@@ -22,6 +24,9 @@ toolbox_main_batch=function(hubname,
 library(dplyr)
 library(parallel)
 library(stringr)
+    
+    options(dplyr.summarise.inform = FALSE)
+
 
 setwd(paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/'))
 working_dir=(paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/'))
@@ -30,7 +35,7 @@ paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/')
 
 #PT paths---------
 PT_data_directory=paste0('/nas/cee-water/cjgleason/calval/xml_scripts/',hubname,'/Munged/')
-flagged_PT_output_directory='Flagged PT/'
+
 #--------------------------------------------------
 #drift paths------------------------------------------
 GNSS_drift_data_directory=paste0('From Andy/',hubname,'_netCDFs/')
@@ -41,27 +46,32 @@ if(reprocess_switch==1){
     reachnode_string= paste0('Data frames/','reprocessed_',  str_replace_all(as.character(Sys.Date()),'\\-','_'))
     node_string =paste0('Data frames/','reprocessed_',  str_replace_all(as.character(Sys.Date()),'\\-','_'),'/node')
     reach_string=paste0('Data frames/','reprocessed_',  str_replace_all(as.character(Sys.Date()),'\\-','_'),'/reach')
+    flagged_PT_output_directory=paste0('Flagged PT/','reprocessed_',  str_replace_all(as.character(Sys.Date()),'\\-','_'))
     
     #check if we've already reprocessed today
     if (dir.exists(drift_string)){
         #if we have, then use that as the output and clear the files in the drift directory
         unlink(drift_string, recursive = TRUE)
         unlink(PT_string,recursive = TRUE)
+        unlink(flagged_PT_output_directory,recursive = TRUE)
         dir.create(drift_string)
+        dir.create(flagged_PT_output_directory)
         dir.create(PT_string)
         QA_QC_drift_output_directory=paste0(drift_string,'/')
         QA_QC_PT_output_directory=paste0(PT_string,'/')
         reachnode_output_directory=paste0(reachnode_string,'/')
+        flagged_PT_output_directory=paste0(flagged_PT_output_directory,'/')
         } else {
         #if we haven't reprocessed today
         
-        
+        dir.create(flagged_PT_output_directory)
     dir.create(drift_string)
     dir.create(PT_string)
     dir.create(reachnode_string)
     dir.create(node_string)
     dir.create(reach_string)
         
+    flagged_PT_output_directory=paste0(flagged_PT_output_directory,'/')
     QA_QC_drift_output_directory=paste0(drift_string,'/')
     reachnode_output_directory=paste0(reachnode_string,'/')
     QA_QC_PT_output_directory=paste0(PT_string,'/')
@@ -92,6 +102,14 @@ foldertimes3=file.info(folderlist3)%>%
  filter(mintime== min(mintime))  
     
 QA_QC_PT_output_directory=paste0(row.names(foldertimes3),'/') 
+    
+folderlist4= list.files('Flagged PT',full.names = TRUE)
+    
+foldertimes4=file.info(folderlist4)%>%
+ mutate(mintime= Sys.time()-mtime) %>%
+ filter(mintime== min(mintime))  
+    
+flagged_PT_output_directory=paste0(row.names(foldertimes4),'/') 
 }
 
 flagged_drift_output_directory='Flagged drifts/'
@@ -104,7 +122,6 @@ SWORD_path=paste0('/nas/cee-water/cjgleason/calval/SWORD_15/netcdf/',continent,
 
 image_directory=paste0('/nas/cee-water/cjgleason/calval/cnes_watermasks/fromCNES_20230724/',rivername,'/extracteo/') 
 print(image_directory)
-    
     
     
     
@@ -132,6 +149,7 @@ read_keys=function(keyfile){
     
 master_key= do.call(rbind,lapply(PT_key_file,read_keys))}else {master_key=NULL}
 
+    print(flagged_drift_output_directory)
     
 #print(unmunged_drifts)
 for (i in 1:length(unmunged_drifts)){
@@ -139,7 +157,8 @@ create_gnss_dataframe(unmunged_drifts[i],
                   gnss_drift_data_directory=GNSS_drift_data_directory,
                   output_directory=QA_QC_drift_output_directory,
                   keyfile= master_key,
-                  rivername=  rivername)}
+                  rivername=  rivername,
+                  naughty_bin_directory=flagged_drift_output_directory)}
 
 
 #     cl=makeCluster(44)
@@ -227,10 +246,26 @@ in_key_unprocessed=unprocessed_files[do.call(rbind,lapply(unprocessed_files,geti
 # print(in_key_unprocessed)
 
     
-# for(thisone in in_key_unprocessed){
+for(thisone in in_key_unprocessed){
 
-#         correct_pt_to_gnss_multikey(thisone,
-#                   master_key=master_key,
+        correct_pt_to_gnss_multikey(thisone,
+                  master_key=master_key,
+                  dist_thresh=dist_thresh_offset,
+                  time_thresh=time_thresh_offset,
+                  pt_data_directory=PT_data_directory,
+                  gnss_drift_data_directory=QA_QC_drift_output_directory,
+                  QA_QC_pt_output_directory=QA_QC_PT_output_directory,
+                  flagged_pt_output_directory=flagged_PT_output_directory,
+                  gnss_sd_thresh=GNSS_sd_thresh,
+                  offset_sd_thresh=offset_sd_thresh,
+                  change_thresh_15_min=change_thresh_15_min) 
+}
+    
+    
+    
+#       cl=makeCluster(40,type='FORK')
+#   dummy=parLapply(cl, in_key_unprocessed,correct_pt_to_gnss_multikey,
+#                    master_key=master_key,
 #                   dist_thresh=dist_thresh_offset,
 #                   time_thresh=time_thresh_offset,
 #                   pt_data_directory=PT_data_directory,
@@ -240,23 +275,7 @@ in_key_unprocessed=unprocessed_files[do.call(rbind,lapply(unprocessed_files,geti
 #                   gnss_sd_thresh=GNSS_sd_thresh,
 #                   offset_sd_thresh=offset_sd_thresh,
 #                   change_thresh_15_min=change_thresh_15_min) 
-# }
-    
-    
-    
-      cl=makeCluster(40,type='FORK')
-  dummy=parLapply(cl, in_key_unprocessed,correct_pt_to_gnss_multikey,
-                   master_key=master_key,
-                  dist_thresh=dist_thresh,
-                  time_thresh=time_thresh,
-                  pt_data_directory=PT_data_directory,
-                  gnss_drift_data_directory=QA_QC_drift_output_directory,
-                  QA_QC_pt_output_directory=QA_QC_PT_output_directory,
-                  flagged_pt_output_directory=flagged_PT_output_directory,
-                  gnss_sd_thresh=GNSS_sd_thresh,
-                  offset_sd_thresh=offset_sd_thresh,
-                  change_thresh_15_min=change_thresh_15_min) 
-  stopCluster(cl)
+#   stopCluster(cl)
     
     
     print('ending PT processing')
@@ -278,7 +297,7 @@ source('/nas/cee-water/cjgleason/calval_toolbox/R code/calculate_slope_wse_fromd
 dummy=calculate_slope_wse_fromdrift(SWORD_path=SWORD_path,
                                     drift_directory=QA_QC_drift_output_directory,
                                     PT_directory=PT_directory,
-                                    output_directory=reachnode_output_directory,
+                                    output_directory=paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/',reachnode_output_directory),
                                     this_river_reach_ids=this_river_reach_IDs,
                                     this_river_node_ids=this_river_node_IDs,
                                     utm_zone=utm_zone, 
@@ -321,6 +340,7 @@ dummy=calculate_slope_wse_fromPT(keyfile=master_key,
                                  SWORD_path=SWORD_path,
                                  SWORD_reach=SWORD_reach,
                                  this_river_reach_ids=this_river_reach_IDs,
+                                 this_river_node_ids=this_river_node_IDs,
                                  rivername=rivername,
                                  output_directory= reachnode_output_directory,
                                  alongstream_error=alongstream_error,

@@ -1,9 +1,12 @@
-create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_directory,rivername,keyfile){
+create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_directory,rivername,keyfile,naughty_bin_directory){
   library(ncdf4)
   library(stringr)
   library(dplyr)
+    
+    #this takes correcte GNSS and writes it to file, applying our cleanup QA QC
   
-
+# print(naughty_bin_directory)
+    
   gnss_nc=nc_open(paste0(gnss_drift_data_directory,log_file,'.nc'))
   # variables we need
   # wse- water surface height wrt geoid. All JPL corrections applied
@@ -116,16 +119,20 @@ if (nrow(bad_info_df)>0){
   }
 }
     
+    
 
   if (nrow(gnss_log)==0){
+      
+    write.csv(gnss_log,paste0(naughty_bin_directory,log_file,"_1.csv"))
     print(paste('filename',log_file,'bonked'))  
+ 
     nc_close(gnss_nc)
     return(NA)
   }
   
 if (nrow(good_info_df)==0){
     gnss_log=gnss_log%>%
-        mutate(drift_id=paste0(drift_id,"_1"))
+        mutate(drift_id=paste0(output_directory,drift_id,"_1.csv"))
     
     write.csv(gnss_log,paste0(output_directory,log_file,"_",as.character(1),'.csv'))
     nc_close(gnss_nc)
@@ -147,7 +154,7 @@ if (nrow(good_info_df)==0){
             this_tp=good_info_df[row,]
             next_tp=good_info_df[(row+1),]
             new_df=filter(gnss_log, gnss_time_UTC >= this_tp$Event_end_UTC & gnss_time_UTC <= next_tp$Event_start_UTC )%>%
-                   mutate(drift_id=paste0(drift_id,"_",as.character(row)))
+                   mutate(drift_id=paste0(output_directory,drift_id,"_",as.character(row),'.csv'))
         
         if(nrow(new_df)==0){return(NA)} #shouldn't happen, but does?
             write.csv(new_df,paste0(output_directory,log_file,"_",as.character(row),'.csv'))

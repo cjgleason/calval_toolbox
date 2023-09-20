@@ -2,6 +2,8 @@ library(dplyr)
 library(ggplot2)
 library(fuzzyjoin)
 
+#temporary code that looked at a specific time period. Do not use
+
 #compare reach WSE pt vs drift-------------
 reach_pt_wse=read.csv('Willamette/SWORD products/reach/Willamette_PT_reach_wse.csv')%>%
   select(-X)
