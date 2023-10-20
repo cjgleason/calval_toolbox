@@ -7,7 +7,8 @@ calculate_slope_wse_fromdrift=function(SWORD_path,drift_directory,PT_directory,o
 
   library(sf)
   library(dplyr)
-  library(rgdal)
+  # library(rgdal)
+ # library(gdal)
   library(ncdf4)
   library(stringr)
     library(parallel)
@@ -15,13 +16,19 @@ calculate_slope_wse_fromdrift=function(SWORD_path,drift_directory,PT_directory,o
 
 LongLatToUTM<-function(x,y,zone){
   xy <- data.frame(id = 1:length(x), X = x, Y = y)
-  coordinates(xy) <- c("X", "Y")
-  proj4string(xy) <- CRS("+proj=longlat +datum=WGS84")  ## for example
-  res <- spTransform(xy, CRS( paste0('+proj=utm +zone=',utm_zone,' +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs')))
+  xy <- st_as_sf(x = xy, 
+                 coords = c("X", "Y"),
+                 crs = "+proj=longlat +datum=WGS84")
+###sp usage original###
+  # st_coordinates(xy) <- c("X", "Y")
+  # proj4string(xy) <- CRS("+proj=longlat +datum=WGS84")  ## for example
+  # res <- spTransform(xy, CRS( paste0('+proj=utm +zone=',utm_zone,' +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs')))
+  res <- st_transform(xy, st_crs( paste0('+proj=utm +zone=',utm_zone,' +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs')))
   res=st_as_sf(res)
   return(data.frame(x=st_coordinates(res)[,1],y=st_coordinates(res)[,2]))
 }
-    
+
+       
   
 suppressWarnings({
 #get SWORD data---------------------------------------
@@ -156,7 +163,7 @@ calc_node_wse=function(drift_file,node_df,cl_df,zone,photo_path){
 
     library(sf)
   library(dplyr)
-  library(rgdal)
+  # library(rgdal)
   library(ncdf4)
   library(stringr)
         
@@ -272,7 +279,7 @@ calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river
   
   library(sf)
   library(dplyr)
-  library(rgdal)
+  # library(rgdal)
   library(ncdf4)
   library(stringr)
 

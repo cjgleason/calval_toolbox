@@ -8,10 +8,15 @@ library(fuzzyjoin)
 library(geodist)
 library(bayesbio)
 library(ncdf4)
+    
+    flag=0
 
     #Creates the PT record as WSE instead of level. Uses multiple key files in cases where PTs went in and out of the water.
     
   pt_serial_file=as.integer(read.table(paste0(pt_data_directory,raw_pt_file), header = FALSE, nrow = 1)$V1)
+    
+    print(pt_serial_file)
+    bonk
         
     #read in master_key--------------
     keyfile=master_key%>%
@@ -46,13 +51,13 @@ library(ncdf4)
    
     # print('here')
     if(!exists('pt_data')){
-             clean_pt='this PT doesnt exist'
+             clean_pt='this PT doesnt exist. I looked in the keyfile and couldnt find a PT that matches it'
                 write.csv(clean_pt,file=paste0(flagged_pt_output_directory,filename))
         return(NA)}
         
     # print('here?')
     if(all(is.na(pt_data))){
-             clean_pt='this PT has no data'
+             clean_pt='this PT has no data- I opened the file and it was empty'
                 write.csv(clean_pt,file=paste0(flagged_pt_output_directory,filename))
         return(NA)}
     
@@ -96,10 +101,11 @@ library(ncdf4)
     
     
     if(nrow(pt_data)==0){
-          clean_pt='there are no GNSS pings in common with the pt data based on the keyfiles'
+          clean_pt='there are no GNSS pings in common with the pt data based on the keyfiles. That is, if you limit the PT record to install and uninstall times in the key, we lose all the PT data. KEYFILE ERROR'
                 write.csv(clean_pt,file=paste0(flagged_pt_output_directory,filename))
         return(NA)
     }
+    
     #check to see if the PT thinks it shifted 
     pt_shift_vector= c(0,pt_data$pt_level)-c(pt_data$pt_level,0)
     if(length(pt_shift_vector)>5){
@@ -108,9 +114,10 @@ library(ncdf4)
   
     if(any(abs(pt_shift_vector)>change_thresh_15_min)){
        # print(plot(pt_shift_vector))
-      clean_pt='the pt self-reports a shift greater than the 15 miniute change threshold'
-                write.csv(clean_pt,file=paste0(flagged_pt_output_directory,filename))
-        return(NA)
+        flag=1
+      # clean_pt='the pt self-reports a shift greater than the 15 miniute change threshold'
+      #           write.csv(clean_pt,file=paste0(flagged_pt_output_directory,filename))
+      #   return(NA)
         }
 
     
@@ -118,6 +125,7 @@ library(ncdf4)
     if (is.na(pt_data[1,]$Date_GNSS_Uninstall)){ #in the case where there is no uninstall
     pt_data_for_offset =pt_data%>%
 #         #taylor says we can throw out all the data before and after the GNSS install, but i don't want to lose the 'approach' time
+        #### Are we filtering by GNSS install/unintsall or PT install/uninstall??? ####
 #     #comjpromise is to filter by DATE, not DATETIME
     filter(pt_time_UTC >= as.POSIXct(paste0(Date_GNSS_Install,' 00:00:00'),format= "%m/%d/%Y %H:%M:%S"))%>%
     # filter(case_when(!is.na(Date_GNSS_Uninstall)~ pt_time_UTC <= as.POSIXct(Date_GNSS_Uninstall,format= "%m/%d/%Y"))) %>% 
@@ -130,7 +138,6 @@ library(ncdf4)
     
     }
     
-
     #now, we've got to go get all of the gnss data associated with our pt. let's go find the data
     log_files=rbind( unique(pt_data$driftID_install),unique(pt_data$driftID_uninstall)) #need both files to work on
     #log_files=unique(prepped_pt$driftID_install)
@@ -143,7 +150,7 @@ library(ncdf4)
     #exception handling for when the indicated GNSS file is not available-----
     if(length(log_files)==0){
        
-         clean_pt='there are no gnss files for this pt'
+         clean_pt='there are no gnss files for this pt. I looked in the keyfile for GNSS files and cant find them. KEYFILE ERROR'
                 write.csv(clean_pt,file=paste0(flagged_pt_output_directory,filename))
       return(NA)
     }
@@ -172,7 +179,6 @@ getit_positive=function(longstring, shortstrings){
        correct_drift_index=which(!is.na(str_match(list.files(gnss_drift_data_directory),string_to_match)))
        driftstring=list.files(gnss_drift_data_directory,full.names=TRUE)[correct_drift_index]
 
-     
         
         
         if(length(driftstring)>1){#we want the most recent
@@ -190,12 +196,10 @@ getit_positive=function(longstring, shortstrings){
                 output=read.csv(driftstring,header=TRUE,stringsAsFactors = FALSE)
                 }
         
-    
         if(identical(driftstring, character(0))){
-               clean_pt='this file has a gnss file that likely hasnt been processed yet'
+               clean_pt='this file has a gnss file that likely hasnt been processed yet. PUSH/PULL GNSS from JPL'
                 write.csv(clean_pt,file=paste0(flagged_pt_output_directory,filename))
         return(NA)}
-        
      
     
     #function to read mutliple gnss files
@@ -233,7 +237,7 @@ getit_positive=function(longstring, shortstrings){
       if(nrow(clean_pt)==0){
      
          # bonk
-          clean_pt='there are no gnss points to make a correciton with'
+          clean_pt='there are no gnss points to make a correction with. The thresholds that define -close enough- between GNSS and pt arent met'
                 write.csv(clean_pt,file=paste0(flagged_pt_output_directory,filename))
         return(NA)
         
@@ -270,19 +274,20 @@ getit_positive=function(longstring, shortstrings){
 
           if (all(is.na(wse_pt))){
             print(filename)
-            print('There are no gnss data within the space-time thresholds')
-            output='There are no gnss data within the space-time thresholds'
+                    clean_pt='there are no gnss points to make a correction with. The thresholds that define -close enough- between GNSS and pt arent met'
+                write.csv(clean_pt,file=paste0(flagged_pt_output_directory,filename))
             return(NA)}
           # 
 
 
           if (nrow(wse_pt)<5 ){
-            print(filename)
-            print('not enough data to create offset, change your thresholds or double check the data')
-            output='not enough data to create offset, change your thresholds or double check the data'
-            offset_pt=mutate(offset_pt,error=output)
-            write.csv(offset_pt,file=paste0(flagged_pt_output_directory,filename))
-            return(NA)
+              flag=flag+10
+            # print(filename)
+            # print('not enough data to create offset, change your thresholds or double check the data')
+            # output='not enough data to create offset, change your thresholds or double check the data. There are data, but not a lot'
+            # offset_pt=mutate(offset_pt,error=output)
+            # write.csv(offset_pt,file=paste0(flagged_pt_output_directory,filename))
+            # return(NA)
           }
 
 
@@ -305,7 +310,8 @@ getit_positive=function(longstring, shortstrings){
     
     final_pt=cbind(pt_data,correct_pings)%>%
             mutate(pt_wse=pt_level+pt_correction)%>%
-            mutate(sigma_pt_correction_m=sd(pt_correction))
+            mutate(sigma_pt_correction_m=sd(pt_correction))%>%
+            mutate(flag=flag)
     #this is a weighted variance of allt he corrections that were applied. There may be only 1-5 corrections ('ping times'), but if e.g. a value is only applied to one PT time then it isn't really affecting the PT record that much. Instead of flagging this, we pass this to the PT file.       
 
           print(filename)
