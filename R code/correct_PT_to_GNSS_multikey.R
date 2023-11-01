@@ -8,13 +8,15 @@ library(fuzzyjoin)
 library(geodist)
 library(bayesbio)
 library(ncdf4)
+library(lubridate)
     
     flag=0
 
     #Creates the PT record as WSE instead of level. Uses multiple key files in cases where PTs went in and out of the water.
     
-  pt_serial_file=as.integer(read.table(paste0(pt_data_directory,raw_pt_file), header = FALSE, nrow = 1)$V1)
-       
+  pt_serial_file=as.integer(read.table(paste0(pt_data_directory,raw_pt_file), header = FALSE, nrow = 1)$V1) 
+
+   
     #read in master_key--------------
     keyfile=master_key%>%
       mutate('driftID_install'= sub("\\..*","",Final_Install_Log_File))%>%
@@ -32,7 +34,8 @@ library(ncdf4)
     },
         error=function(cond){return(NA)})
           #cleanup
-    filename=raw_pt_file    
+    
+    filename=raw_pt_file  
     filename_base=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/')[[1]])])
     filename=paste0(filename_base,'_',unique(pt_data$keyid))
     
@@ -58,7 +61,6 @@ library(ncdf4)
                 write.csv(clean_pt,file=paste0(flagged_pt_output_directory,filename))
         return(NA)}
     
- 
    sum1=sum(!is.na(str_match(pt_data$Time, 'pm')))
    sum2=sum(!is.na(str_match(pt_data$Time, 'am')))
    sum3=sum(!is.na(str_match(pt_data$Time, 'PM')))
@@ -86,7 +88,7 @@ library(ncdf4)
     transmute(pt_time_UTC=pt_time_UTC,pt_lat=pt_Lat,pt_lon=pt_Lon,
      pt_install_UTC=as.POSIXct(paste(Date_PT_Install,Time_PT_Install_UTC),format= "%m/%d/%Y %H:%M"),
      pt_uninstall_UTC=as.POSIXct(paste(Date_PT_Uninstall,Time_PT_Uninstall_UTC),format= "%m/%d/%Y %H:%M"),
-                   gnss_install_UTC=as.POSIXct(paste(Date_GNSS_Install,Time_GNSS_Install_Start_UTC),format= "%m/%d/%Y %H:%M"),
+     gnss_install_UTC=as.POSIXct(paste(Date_GNSS_Install,Time_GNSS_Install_Start_UTC),format= "%m/%d/%Y %H:%M"),
      gnss_uninstall_UTC=as.POSIXct(paste(Date_GNSS_Uninstall,Time_GNSS_Uninstall_End_UTC),format= "%m/%d/%Y %H:%M"),
          install_method=Install_method, pt_serial=pt_serial,         
          pt_level=Level,temperature=Temperature,
@@ -96,9 +98,11 @@ library(ncdf4)
     filter(pt_time_UTC >= pt_install_UTC)%>%
     filter(pt_time_UTC <= pt_uninstall_UTC)
     
+    ### Test here for pt checking of second condition ###
+  
     
     if(nrow(pt_data)==0){
-          clean_pt='there are no GNSS pings in common with the pt data based on the keyfiles. That is, if you limit the PT record to install and uninstall times in the key, we lose all the PT data. KEYFILE ERROR'
+          clean_pt='the keyfile says this pt was never in the water. KEYFILE ERROR'
                 write.csv(clean_pt,file=paste0(flagged_pt_output_directory,filename))
         return(NA)
     }
@@ -109,6 +113,7 @@ library(ncdf4)
     pt_shift_vector=pt_shift_vector[3:(length(pt_shift_vector)-3)]}
     
   
+    ### PT has shifted, but we flag and move to munged PT bin ###
     if(any(abs(pt_shift_vector)>change_thresh_15_min)){
        # print(plot(pt_shift_vector))
         flag=1
@@ -116,9 +121,18 @@ library(ncdf4)
       #           write.csv(clean_pt,file=paste0(flagged_pt_output_directory,filename))
       #   return(NA)
         }
-
     
+    ### An exception to handle when install time is not in PT file, 15 minutes is added to start GNSS occupy time to encompass PT click ###
+    # print(pt_data[1,]$gnss_install_UTC + minutes(15))
+    # print(pt_data[1,]$pt_time_UTC)
+    # bonk
     
+    if((as.POSIXct(pt_data[1,]$gnss_install_UTC + minutes(15)) < as.POSIXct(pt_data[1,]$pt_time_UTC))){
+        clean_pt='the keyfile indicates the install time did not occur within the PT data range, fix key file'
+            write.csv(clean_pt,file=paste0(flagged_pt_output_directory,filename))
+        return(NA)
+        }
+  
     if (is.na(pt_data[1,]$Date_GNSS_Uninstall)){ #in the case where there is no uninstall
     pt_data_for_offset =pt_data%>%
 #         #taylor says we can throw out all the data before and after the GNSS install, but i don't want to lose the 'approach' time
@@ -135,12 +149,12 @@ library(ncdf4)
     
     }
     
+    
     #now, we've got to go get all of the gnss data associated with our pt. let's go find the data
     log_files=rbind( unique(pt_data$driftID_install),unique(pt_data$driftID_uninstall)) #need both files to work on
     #log_files=unique(prepped_pt$driftID_install)
     log_files=log_files[!is.na(log_files)]
         
-  
     #in case the PT went dry, need to eliminate missing installa nd uninstall files
     log_files=log_files[log_files != ""]
     
@@ -203,18 +217,20 @@ getit_positive=function(longstring, shortstrings){
       gnss_log=do.call(rbind,lapply(driftstring,read_multi_gnss))%>%
         mutate(datetime=gnss_time_UTC)%>%
         mutate(datetime=as.POSIXct(datetime)) #needed as when it gets written to csv it becomes not a posix objec
-       
-                       # print(gnss_log)
-                       # bonk
     }
     
   gnss_log=do.call(rbind,lapply(splitter,get_all_gnss))
     
-
-
-    #now, join the GNSS 1Hz data to the PT 15 minute data
-    clean_pt_time=difference_inner_join(pt_data_for_offset,gnss_log,by='datetime',max_dist=time_thresh,distance_col='test')
     
+    #double handle. above we determined that there aren't gnss data ready for this yet, but it returned an 
+    #NA to here, which was writing teh file correctly and then bonking here. 
+     if(all(is.na(gnss_log))){
+         return(NA)} 
+    
+
+    #now, join the GNSS 1Hz data to the PT 15 minute data - 10/26 may need to make this ignore seconds in pt file - dies during PD335 file at 1 minute data
+    clean_pt_time=difference_inner_join(pt_data_for_offset,gnss_log,by='datetime',max_dist=time_thresh,distance_col='test')
+     
     #need lon then lat
     distance_m=geodist(cbind(clean_pt_time$pt_lon, clean_pt_time$pt_lat),    cbind(clean_pt_time$gnss_Lon, clean_pt_time$gnss_Lat), paired=TRUE,measure='haversine')
 
@@ -229,7 +245,7 @@ getit_positive=function(longstring, shortstrings){
    
     #if we want to filter to just times covered by the install and uninstall, we'd do so with 
     #a pipe here. Currently not doing that as we want to check in the middle for changes.
-      
+    
       #next, ensure there are enough gnss points to make a valid offset correction
       if(nrow(clean_pt)==0){
      
@@ -263,7 +279,7 @@ getit_positive=function(longstring, shortstrings){
 
     #split into multiple files based on the keyids
     final_pt_data_frames=split(wse_pt,wse_pt$keyid)
-
+    
     #now we've got a dataframe for each key file. Check each for what we need
     check_data_frames=function(wse_pt,pt_data,filename_base){
     
@@ -294,7 +310,6 @@ getit_positive=function(longstring, shortstrings){
     mutate(pt_time_UTC=as.POSIXct(pt_time_UTC,format ="%Y-%m-%d %H:%M:%S"))%>%
     group_by(pt_time_UTC)%>%
     summarise(pt_time_UTC=first(pt_time_UTC),pt_correction=first(pt_correction),pt_wse_sd=first(pt_wse_sd))
-    
  
     find_closest_ping=function(pt_df,offset_df){
         time_diff= as.POSIXct(pt_df['pt_time_UTC'])- offset_df$pt_time_UTC
@@ -324,7 +339,6 @@ getit_positive=function(longstring, shortstrings){
     
     gc()
     rm(dummy)
-
 
 }#end toplevel function 
 

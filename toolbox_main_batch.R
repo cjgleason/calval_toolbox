@@ -194,12 +194,39 @@ raw_PT_files=PT_files[csv_index]
 
 #open the key files   
 read_keys=function(keyfile){
-   this_key= read.csv(keyfile,stringsAsFactors=FALSE)%>%
+   this_key= read.csv(keyfile,stringsAsFactors=FALSE, na.strings = c("","NA","na","NaN", " "))%>%
     mutate(keyid=keyfile)%>%
     mutate(pt_serial=as.integer(PT_Serial))
     }
     
 master_key= do.call(rbind,lapply(PT_key_file,read_keys))
+
+# Key file QA/QC check #
+key_col_names = c("PT_Serial", "Label", "Node_ID", "Reach_ID", "US_Reach_ID", 
+                      "DS_Reach_ID", "Lat_WGS84", "Long_WGS84", "Install_method",
+                      "Date_PT_Install", "Time_PT_Install_UTC", "Date_PT_Uninstall",
+                      "Time_PT_Uninstall_UTC", "Date_GNSS_Install", "Time_GNSS_Install_Start_UTC", 
+                      "Time_GNSS_Install_End_UTC", "GNSS_Offset_m", "Receiver_Install", "Original_Install_Log_File", 
+                      "Final_Install_Log_File", "Date_GNSS_Uninstall", "Time_GNSS_Uninstall_Start_UTC", 
+                      "Time_GNSS_Uninstall_End_UTC", "Receiver_Uninstall", "Original_Uninstall_Log_File", "Final_Uninstall_Log_File",
+                      "keyid", "pt_serial")
+hub_key_colnames = colnames(master_key)
+
+key_check <- function(key_col_names, hub_key_colnames){
+  if(length(key_col_names) == length(hub_key_colnames)) {
+    print('Key file column names are of equal length')
+  }
+  if(length(which(is.na(match(key_col_names,hub_key_colnames))))!=0) {
+    stop(paste('Key file has a missing/misnamed column',which(is.na(match(key_col_names,hub_key_colnames))),",",
+               key_col_names[!key_col_names %in% hub_key_colnames],", please fix and reupload, and/or the Key file has an extra/misnamed column",
+               which(is.na(match(hub_key_colnames,key_col_names))),",", hub_key_colnames[!hub_key_colnames %in% key_col_names],", please fix and reupload"))
+  }
+  if(length(unique(master_key$Node_ID))<=2){stop("Check that node ID in key file did not lose precision with scientific notation, if so, fix key and reupload.")}
+    else{print("Key file passes QA/QC checks")}
+}
+
+key_check(key_col_names,hub_key_colnames)
+    
     
 #three key info here-
     #1 PTs in the key
@@ -328,7 +355,7 @@ this_river_reach_IDs= as.numeric(as.character(unique(SWORD_reach$Reach_ID)))
 source('/nas/cee-water/cjgleason/calval_toolbox/R code/calculate_slope_wse_fromPT.R')
 
 read_keys=function(keyfile){
-   this_key= read.csv(keyfile,stringsAsFactors=FALSE)%>%
+   this_key= read.csv(keyfile,stringsAsFactors=FALSE, na.strings = c("","NA","na","NaN", " "))%>%
     mutate(keyid=keyfile)%>%
     mutate(pt_serial=as.integer(PT_Serial))
     }
@@ -379,7 +406,7 @@ munged_pt_directory=paste0(working_dir,QA_QC_PT_output_directory)
 source('/nas/cee-water/cjgleason/calval_toolbox/R code/select_appropriate_drift.R')
 
 read_keys=function(keyfile){
-   this_key= read.csv(keyfile,stringsAsFactors=FALSE)%>%
+   this_key= read.csv(keyfile,stringsAsFactors=FALSE, na.strings = c("","NA","na","NaN", " "))%>%
     mutate(keyid=keyfile)%>%
     mutate(pt_serial=as.integer(PT_Serial))
     }
