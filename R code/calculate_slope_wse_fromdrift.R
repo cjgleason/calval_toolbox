@@ -175,38 +175,33 @@ calc_node_wse=function(drift_file,node_df,cl_df,zone,photo_path){
       mutate(gnss_time_UTC=as.POSIXct(gnss_time_UTC))#needed as when it gets written to csv it becomes not a posix object
       
   
+node_cls=node_df%>%
+  left_join(cl_df,by=c('node_id','reach_id'))%>%
+  group_by(node_id)%>%
+  filter(cl_id == min(cl_id) | cl_id == max(cl_id)) %>%
+  mutate(node_angle= atan((cl_UTM_y[cl_id == min(cl_id)]-cl_UTM_y[cl_id == max(cl_id)])/(cl_UTM_x[cl_id == min(cl_id)]-cl_UTM_x[cl_id == max(cl_id)])))%>%
+  dplyr::select(-geometry)%>%
+  #make a polygon geometry- 4 points, with the first point repeated for 5 total points
+  mutate(point1_x=  cl_UTM_x[cl_id == min(cl_id)] -cos(node_angle-(90*pi/180))*node_wmax*scale_maxwidth, 
+         point1_y=  cl_UTM_y[cl_id == min(cl_id)] +sin(node_angle-(90*pi/180))*node_wmax*scale_maxwidth,
+         point2_x=  cl_UTM_x[cl_id == max(cl_id)] -cos(node_angle-(90*pi/180))*node_wmax*scale_maxwidth,
+         point2_y=  cl_UTM_y[cl_id == max(cl_id)] +sin(node_angle-(90*pi/180))*node_wmax*scale_maxwidth,
+         point3_x=  cl_UTM_x[cl_id == max(cl_id)] +cos(node_angle-(90*pi/180))*node_wmax*scale_maxwidth,
+         point3_y=  cl_UTM_y[cl_id == max(cl_id)] -sin(node_angle-(90*pi/180))*node_wmax*scale_maxwidth,
+         point4_x=  cl_UTM_x[cl_id == min(cl_id)] +cos(node_angle-(90*pi/180))*node_wmax*scale_maxwidth,
+         point4_y=  cl_UTM_y[cl_id == min(cl_id)] -sin(node_angle-(90*pi/180))*node_wmax*scale_maxwidth) %>% 
+  ungroup()
 
-  node_cls=node_df%>%
-    left_join(cl_df,by=c('node_id','reach_id'))%>%
-    group_by(node_id)%>%
-    filter(cl_id == min(cl_id) | cl_id == max(cl_id)) %>%
-    mutate(node_angle= atan((cl_UTM_y[cl_id == min(cl_id)]-cl_UTM_y[cl_id == max(cl_id)])/(cl_UTM_x[cl_id == min(cl_id)]-cl_UTM_x[cl_id == max(cl_id)])))%>%
-    dplyr::select(-geometry)%>%
-    #make a polygon geometry- 4 points, with the first point repeated for 5 total points
-    mutate(point1_x= node_UTM_x+cos(node_angle)*node_length/2, 
-           point1_y= node_UTM_y+sin(node_angle)*node_length/2,
-           point2_x=node_UTM_x -cos(node_angle)*node_length/2,
-           point2_y=node_UTM_y- sin(node_angle)*node_length/2,
-           point3_x=node_UTM_x +cos(node_angle-(90*pi/180))*node_wmax*2,
-           point3_y=node_UTM_y+ sin(node_angle-(90*pi/180))*node_wmax*2,
-           point4_x=node_UTM_x -cos(node_angle-(90*pi/180))*node_wmax*2,
-           point4_y= node_UTM_y-sin(node_angle-(90*pi/180))*node_wmax*2) %>%
-   mutate(node_box_x_max=max(c(point1_x,point2_x,point3_x,point4_x)),
-          node_box_x_min=min(c(point1_x,point2_x,point3_x,point4_x)),
-          node_box_y_max=max(c(point1_y,point2_y,point3_y,point4_y)),
-          node_box_y_min=min(c(point1_y,point2_y,point3_y,point4_y)))%>%
-    ungroup()
-                        
-  make_polys= function(node_df){
 
-    polygon_list= st_polygon( list(rbind(c(node_df['node_box_x_min'],node_df['node_box_y_min']),
-                                         
-                              c(node_df['node_box_x_min'],node_df['node_box_y_max']),
-                              c(node_df['node_box_x_max'],node_df['node_box_y_max']),
-                              c(node_df['node_box_x_max'],node_df['node_box_y_min']),
-                              c(node_df['node_box_x_min'],node_df['node_box_y_min']) )))
-    
-  }
+make_polys= function(node_df){
+  
+  polygon_list= st_polygon( list(rbind(c(node_df['point1_x'],node_df['point4_y']),
+                                       c(node_df['point2_x'],node_df['point3_y']),
+                                       c(node_df['point3_x'],node_df['point2_y']),
+                                       c(node_df['point4_x'],node_df['point1_y']),
+                                       c(node_df['point1_x'],node_df['point4_y']) )))
+  
+}
   
   poly_list=apply(node_cls, 1,make_polys )
   
