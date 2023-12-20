@@ -8,6 +8,7 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
 # print(naughty_bin_directory)
     
   gnss_nc=nc_open(paste0(gnss_drift_data_directory,log_file,'.nc'))
+
   # variables we need
   # wse- water surface height wrt geoid. All JPL corrections applied
   # longitude- longitude

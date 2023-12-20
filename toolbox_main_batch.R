@@ -19,7 +19,8 @@ toolbox_main_batch=function(hubname,
                            measurement_error, 
                             time_threshold_sec_match,
                             wse_threshold_m_match,
-                            distance_threshold_m_match){
+                            distance_threshold_m_match,
+                           scale_maxwidth){
 
 library(dplyr)
 library(parallel)
@@ -48,20 +49,45 @@ if(reprocess_switch==1){
     reach_string=paste0('Data frames/','reprocessed_',  str_replace_all(as.character(Sys.Date()),'\\-','_'),'/reach')
     flagged_PT_output_directory=paste0('Flagged PT/','reprocessed_',  str_replace_all(as.character(Sys.Date()),'\\-','_'))
     
-    #check if we've already reprocessed today
+    directories = c(drift_string, PT_string, reachnode_string, node_string, reach_string, flagged_PT_output_directory)
+    match = paste0("_",rivername,"_")
+    
+  # This should preserve other hub files when reprocessing one site (on the same day) in a hub that hosts multiple #
     if (dir.exists(drift_string)){
-        #if we have, then use that as the output and clear the files in the drift directory
-        unlink(drift_string, recursive = TRUE)
-        unlink(PT_string,recursive = TRUE)
-        unlink(flagged_PT_output_directory,recursive = TRUE)
-        dir.create(drift_string)
-        dir.create(flagged_PT_output_directory)
-        dir.create(PT_string)
+        for (dir in directories) {
+  # List all files in the current directory
+          file_list <- list.files(dir, full.names = TRUE)
+
+  # Filter files to keep only the ones that match the string
+          matching_files <- file_list[grep(match, file_list)]
+
+  # Delete the files
+          if (length(matching_files) > 0) {
+            file.remove(matching_files)
+            cat(rivername, "only rerun, so deleted files in directory:", dir, "\n")
+            } 
+        }
+  # Define directories if nothing was deleted  
         QA_QC_drift_output_directory=paste0(drift_string,'/')
         QA_QC_PT_output_directory=paste0(PT_string,'/')
         reachnode_output_directory=paste0(reachnode_string,'/')
         flagged_PT_output_directory=paste0(flagged_PT_output_directory,'/')
-        } else {
+    }
+    else {
+    #check if we've already reprocessed today
+    # if (dir.exists(drift_string)){
+    #     #if we have, then use that as the output and clear the files in the drift directory
+    #     unlink(drift_string, recursive = TRUE)
+    #     unlink(PT_string,recursive = TRUE)
+    #     unlink(flagged_PT_output_directory,recursive = TRUE)
+    #     dir.create(drift_string)
+    #     dir.create(flagged_PT_output_directory)
+    #     dir.create(PT_string)
+    #     QA_QC_drift_output_directory=paste0(drift_string,'/')
+    #     QA_QC_PT_output_directory=paste0(PT_string,'/')
+    #     reachnode_output_directory=paste0(reachnode_string,'/')
+    #     flagged_PT_output_directory=paste0(flagged_PT_output_directory,'/')
+    #     } else {
         #if we haven't reprocessed today
         
         dir.create(flagged_PT_output_directory)
@@ -77,7 +103,7 @@ if(reprocess_switch==1){
     QA_QC_PT_output_directory=paste0(PT_string,'/')
     }
     
-    } else { #we aren't reprocessing. find the most recent folders to use
+} else { #we aren't reprocessing. find the most recent folders to use
     
 folderlist= list.files('Munged drifts',full.names = TRUE)
     
@@ -122,8 +148,6 @@ SWORD_path=paste0('/nas/cee-water/cjgleason/calval/SWORD_15/netcdf/',continent,
 
 image_directory=paste0('/nas/cee-water/cjgleason/calval/cnes_watermasks/fromCNES_20230724/',rivername,'/extracteo/') 
 print(image_directory)
-    
-    
     
  #create dataframes from drifts---------------------------------------------------------
 #pull filename before the .csv
@@ -202,7 +226,7 @@ read_keys=function(keyfile){
 master_key= do.call(rbind,lapply(PT_key_file,read_keys))
 
 # Key file QA/QC check #
-key_col_names = c("PT_Serial", "Label", "Node_ID", "Reach_ID", "US_Reach_ID", 
+key_col_names = c("PT_Serial", "Label", "Baro_Comp", "Node_ID", "Reach_ID", "US_Reach_ID", 
                       "DS_Reach_ID", "Lat_WGS84", "Long_WGS84", "Install_method",
                       "Date_PT_Install", "Time_PT_Install_UTC", "Date_PT_Uninstall",
                       "Time_PT_Uninstall_UTC", "Date_GNSS_Install", "Time_GNSS_Install_Start_UTC", 
@@ -226,7 +250,6 @@ key_check <- function(key_col_names, hub_key_colnames){
 }
 
 key_check(key_col_names,hub_key_colnames)
-    
     
 #three key info here-
     #1 PTs in the key
@@ -331,7 +354,8 @@ dummy=calculate_slope_wse_fromdrift(SWORD_path=SWORD_path,
                                     buffer=reach_end_buffer,
                                     rivername=rivername,
                                     reprocess_switch=reprocess_switch,
-                                    core_count=core_count)
+                                    core_count=core_count,
+                                   scale_maxwidth=scale_maxwidth)
     
     
 print('ending drift dataframe creation')
@@ -385,7 +409,7 @@ print('ending pt dataframe creation')
 
 if (process_PTs ==1){
     print('starting matching')
-passfile=paste0('/nas/cee-water/cjgleason/calval/Processed data/riversp_list_clean_',rivername,'_20230726.txt')
+passfile=paste0('/nas/cee-water/cjgleason/calval/Processed data/riversp_list_clean_',rivername,'_20231102.txt')
 
  
 passnames=read.delim(passfile,header=F)$V1

@@ -8,60 +8,44 @@ library(tidyr)
 library(fuzzyjoin)
 library(geodist)
 library(bayesbio)
-
-reprocess_switch=0#0 or 1. 1 means to recreate all reach and node products following some change in processing. 
-#0 means to just append to existing dataframes
-process_PTs=1 # switch. do you want to deal with PTs and all downstream processing?
-process_airborne =0 #swtich
-
-# hubname='UNC'
-# rivername='WK'
-# continent='oc'
-# PT_key_file= 'SWOTCalVal_WK_KEY_20230331_20230507_1.csv' #WK
-# utm_zone='58 +south'#WK='58 +south'
-
-# hubname='UNC'
-# rivername='PY'
-# continent='na'
-# utm_zone=6 
-
-# hubname='UNC'
-# rivername='YR'
-# continent='na'
-# utm_zone=6 
-
-# hubname='UMass'
-# rivername='CR'
-# continent='na'
-# PT_key_file=c('SWOTCalVal_CR_Key_20230322_20230614.csv',
-#               'SWOTCalVal_CR_Key_20230516_20230613.csv') #CT
-# utm_zone=18 #Ct= 18
-
-hubname='CU'
-rivername='WM'
-continent='na'
-PT_key_file= c('SWOTCalVal_WM_KEY_20230326_20230510.csv',
-              'SWOTCalVal_WM_KEY_20230509_20230601.csv',
-              'SWOTCalVal_WM_KEY_20230601_20230707.csv',
-               'SWOTCalVal_WM_KEY_20230601_20230801.csv'   )#WM
-utm_zone=10 #WM= 10
-
-# hubname='Brown'
-# rivername='NS'
-# continent='na'
-# PT_key_file= 'SWOTCalVal_NS_KEY_20230525_20230613.csv' #WM
-# utm_zone=13 #NS= 13
+library(purrr)
+library(ggplot2)
 
 
-reach_end_buffer=500 #m, 'extends' the reach
+setwd(paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Data frames/reprocessed_2023_10_31/node'))
+working_dir=(paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Data frames/reprocessed_2023_10_31/node'))
 
-setwd(paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/'))
-working_dir=(paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/'))
-domain_file=paste0(rivername,'_domain.csv')
-paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/')
 
 #PT paths---------
 PT_data_directory=paste0('/nas/cee-water/cjgleason/calval/xml_scripts/',hubname,'/Munged/')
+
+
+
+setwd("C:/Users/throwley/OneDrive - University of Massachusetts/Calval/Toolbox_Testing/NS_test")
+
+# List of CSV file names (replace with your file names)
+csv_files <- list.files("C:/Users/throwley/OneDrive - University of Massachusetts/Calval/Toolbox_Testing/NS_test")
+
+# Function to read a CSV file and return a data frame
+read_csv_file <- function(file) {
+  read.csv(file, header = TRUE)
+}
+
+# Use purrr::map_df to read and combine all CSV files into a single data frame
+combined_data <- map_df(csv_files, read_csv_file, na.rm = TRUE)
+combined_data <- combined_data[,-9]
+combined_data <- combined_data[!is.na(combined_data[[3]]),]
+# date = as.POSIXct(combined_data$pt_time_UTC, format = "%Y-%m-%d %H:%M:%S")
+combined_data$pt_time_UTC = as.POSIXct(combined_data$pt_time_UTC, format = "%Y-%m-%d %H:%M:%S")
+
+plot <- ggplot(combined_data, aes(x = pt_time_UTC, y = mean_node_pt_wse_m, group = pt_serial, color = factor(pt_serial))) +
+  geom_line() +
+  labs(title = "Time Series Plot by Group", x = "time_UTC", y = "WSE_m", color = "PTs") +
+  scale_x_datetime(date_labels = "%Y-%m-%d", date_breaks = "2 days") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  facet_wrap(~reach_id, scales = "free_y", ncol = 1)
+ 
+plot
 
 #--------------------------------------------------
 #drift paths------------------------------------------

@@ -7,9 +7,9 @@ calculate_slope_wse_fromPT=function(keyfile,pt_files,SWORD_path,SWORD_reach,this
     options(warn=-1)
    # detach(package:'plyr')
 
-  #read in key file
+  #read in key file and add unique id (pt_id) column to get at PT serial moving nodes in river
   key_df=keyfile%>%
-    transmute(pt_serial=as.integer(PT_Serial),node_id=as.character(Node_ID),reach_id=as.character(Reach_ID),us_reach_id=as.character(US_Reach_ID),ds_reach_id=as.character(DS_Reach_ID))%>%
+    transmute(pt_serial=as.integer(PT_Serial),pt_id = paste0(PT_Serial,'_',Node_ID),node_id=as.character(Node_ID),reach_id=as.character(Reach_ID),us_reach_id=as.character(US_Reach_ID),ds_reach_id=as.character(DS_Reach_ID))%>%
     filter(!is.na(pt_serial))
   #read in SWORD
   
@@ -28,21 +28,29 @@ calculate_slope_wse_fromPT=function(keyfile,pt_files,SWORD_path,SWORD_reach,this
   
  run_nodes=function(pt_file,key_df,measurement_error,alongstream_error,crossstream_error,node_dist_df){
     
-       #read in pt files
+#read in pt files - create new pt_id field that is pt_serial and node id to prevent serial id confusion if geographically moved in river
   pt_df=read.csv(pt_file)%>%
-    dplyr::select(pt_serial,pt_time_UTC,pt_wse,pt_wse_sd,sigma_pt_correction_m)%>%
-    left_join(key_df,by='pt_serial',relationship='many-to-many')
-    
+    dplyr::select(pt_serial,pt_time_UTC,pt_wse,pt_wse_sd,sigma_pt_correction_m,Node_ID,flag)%>%
+     mutate(pt_id = paste0(pt_serial,'_',Node_ID))%>%
+    left_join(key_df,by='pt_id',relationship='many-to-many')
+
   #calculate node wse
   node_df=pt_df%>%
-    group_by(node_id,pt_time_UTC)%>%      summarise(pt_serial=first(pt_serial),mean_node_pt_wse_m=mean(pt_wse),mean_pt_wse_precision_m=alongstream_error+crossstream_error+measurement_error,sigma_pt_correction_m=sigma_pt_correction_m)%>% #JPL wants precision, not variance mean(pt_wse_sd)
+    group_by(node_id,pt_time_UTC)%>%      summarise(pt_id=first(pt_id),pt_serial=pt_serial.x,mean_node_pt_wse_m=mean(pt_wse),mean_pt_wse_precision_m=alongstream_error+crossstream_error+measurement_error,sigma_pt_correction_m=sigma_pt_correction_m, flag=flag)%>% #JPL wants precision, not variance mean(pt_wse_sd)
     ungroup()%>%#based on grouping, it will repeat
     mutate(node_id=as.character(node_id))%>%
     left_join(node_dist_df,by='node_id')%>%
      distinct()
+     # 12/20 added node ID to file name to make sure if PT serial is moved within river, it will not glom onto the wrong record 
+     output_name=paste0(output_directory,'node/',rivername,'_',as.character(pt_df$pt_id[1]),'_PT_node_wse.csv')
      
-
-  write.csv(node_df,file=paste0(output_directory,'node/',rivername,'_',as.character(pt_df$pt_serial[1]),'PT_node_wse.csv'),row.names=FALSE)
+# This adds additional information from same PT in different key file to maintain PT record    
+if(file.exists(output_name)){
+    holdit=read.csv(output_name)
+    write_it=rbind(holdit,node_df)%>%distinct() #in csae the folder wasn't empty and we just duplicated something
+    write.csv(write_it,output_name,col.names=TRUE,row.names=FALSE)  }else{
+  write.csv(node_df,output_name,col.names=TRUE,row.names=FALSE)
+}#3dn file check
   }#end node function
     
  runit=lapply(pt_files,   run_nodes, 
@@ -51,6 +59,8 @@ calculate_slope_wse_fromPT=function(keyfile,pt_files,SWORD_path,SWORD_reach,this
               alongstream_error=alongstream_error,
               crossstream_error=crossstream_error,
              node_dist_df=node_dist_df)
+    
+   
   
  #wrapper to limit data read in
 read_in_pt_reach=function(pt_file,this_reach_id,key_df){

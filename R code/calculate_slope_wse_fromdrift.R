@@ -1,5 +1,5 @@
 calculate_slope_wse_fromdrift=function(SWORD_path,drift_directory,PT_directory,output_directory,this_river_reach_ids,this_river_node_ids,
-                                       utm_zone, buffer,rivername, photo_path=NULL, reprocess_switch, core_count){
+                                       utm_zone, buffer,rivername, photo_path=NULL, reprocess_switch, core_count, scale_maxwidth){
   
     suppressWarnings({
 
@@ -19,6 +19,7 @@ LongLatToUTM<-function(x,y,zone){
   xy <- st_as_sf(x = xy, 
                  coords = c("X", "Y"),
                  crs = "+proj=longlat +datum=WGS84")
+    
 ###sp usage original###
   # st_coordinates(xy) <- c("X", "Y")
   # proj4string(xy) <- CRS("+proj=longlat +datum=WGS84")  ## for example
@@ -28,12 +29,11 @@ LongLatToUTM<-function(x,y,zone){
   return(data.frame(x=st_coordinates(res)[,1],y=st_coordinates(res)[,2]))
 }
 
-       
   
 suppressWarnings({
 #get SWORD data---------------------------------------
 SWORD_in=nc_open(SWORD_path,verbose=FALSE)
-
+    
 reachids=ncvar_get(SWORD_in, 'reaches/reach_id',verbose=FALSE)
 reach_index= which(reachids %in% this_river_reach_ids)
 
@@ -63,6 +63,8 @@ node_df=data.frame(lon=node_x,lat=node_y,node_id=node_nodeid,node_wmax=node_max_
 node_df= node_df%>%
   mutate(node_UTM_x=LongLatToUTM(node_df$lon,node_df$lat,utm_zone)[,1])%>%
   mutate(node_UTM_y=LongLatToUTM(node_df$lon,node_df$lat,utm_zone)[,2])
+    
+
 #------------------------------------------------------
 
 #Reach variables-------
@@ -154,26 +156,24 @@ cl_df=st_as_sf(cl_df,coords=c('lon','lat'),remove=FALSE, crs='+proj=longlat +ell
 cl_df=cl_df%>%
   mutate(cl_UTM_x=LongLatToUTM(cl_df$lon,cl_df$lat,utm_zone)[,1])%>%
   mutate(cl_UTM_y=LongLatToUTM(cl_df$lon,cl_df$lat,utm_zone)[,2])
-    
-
 #------------------------------------------------------
 
 #calculate node wse----------------------------------
-calc_node_wse=function(drift_file,node_df,cl_df,zone,photo_path){
+calc_node_wse=function(drift_file,node_df,cl_df,zone,photo_path,scale_maxwidth){
 
     library(sf)
   library(dplyr)
   # library(rgdal)
   library(ncdf4)
   library(stringr)
-        
-   drift_in=read.csv(drift_file,header=TRUE,stringsAsFactors = FALSE)%>%
+    
+      ### Need to point to the drift files in function?? ###  
+   drift_in=read.csv(drift_file,header=TRUE,stringsAsFactors = FALSE)%>% 
     filter(!is.na(gnss_Lon))%>%
     filter(!is.na(gnss_Lat))%>%
       mutate(UTM_x=LongLatToUTM(gnss_Lon,gnss_Lat,zone)[,1])%>%
       mutate(UTM_y=LongLatToUTM(gnss_Lon,gnss_Lat,zone)[,2])%>%
       mutate(gnss_time_UTC=as.POSIXct(gnss_time_UTC))#needed as when it gets written to csv it becomes not a posix object
-      
   
 node_cls=node_df%>%
   left_join(cl_df,by=c('node_id','reach_id'))%>%
@@ -253,11 +253,11 @@ make_polys= function(node_df){
               time=mean(gnss_time_UTC),
               node_height_above_ellipsoid=mean(height_above_ellipsoid,na.rm=TRUE),
               reach_id=reach_id[1],
-              drift_id=drift_id[1],
-              node_box_x_max=node_box_x_max[1], 
-              node_box_x_min=node_box_x_min[1], 
-              node_box_y_max=node_box_y_max[1], 
-              node_box_y_min=node_box_y_min[1]
+              drift_id=drift_id[1]
+              # node_box_x_max=node_box_x_max[1], 
+              # node_box_x_min=node_box_x_min[1], 
+              # node_box_y_max=node_box_y_max[1], 
+              # node_box_y_min=node_box_y_min[1]
               )%>%
    left_join(geometry_saver,by='node_id')%>%
     mutate(drift_id=drift_file)
@@ -454,7 +454,7 @@ if(reprocess_switch ==0){
     
  # CLUSTER=makeCluster(core_count)
 
-node_wses=do.call(rbind,lapply(drifts,calc_node_wse,node_df=node_df,cl_df=cl_df,zone=utm_zone,photo_path=photo_path))%>%
+node_wses=do.call(rbind,lapply(drifts,calc_node_wse,node_df=node_df,cl_df=cl_df,zone=utm_zone,photo_path=photo_path, scale_maxwidth=scale_maxwidth))%>%
   mutate(node_id=format(node_id,scientific=FALSE))%>%
   mutate(geometry= geometry.x)%>%
   as.data.frame()%>%
@@ -471,7 +471,7 @@ node_wses=do.call(rbind,lapply(drifts,calc_node_wse,node_df=node_df,cl_df=cl_df,
 #   dplyr::select(-geometry.x,-geometry.y,-poly_list)
 
 node_geom=as.data.frame(node_wses)%>%
-  dplyr::select(node_id,node_box_x_min,node_box_x_max,node_box_y_min,node_box_y_max,geometry)
+  dplyr::select(node_id,geometry)
 
     
     
@@ -501,10 +501,10 @@ write.csv(reach_geom,paste0(output_directory,'/reach/',rivername,'_drift_reach_g
 write.csv(node_wses,paste0(output_directory,'/node/',rivername,'_drift_node_wses.csv'),append=FALSE,row.names=FALSE)
 write.csv(reach_stats,paste0(output_directory,'/reach/',rivername,'_drift_reach_wse_slope.csv'),append=FALSE,row.names=FALSE)} else {
         
-write.csv(node_geom,paste0(output_directory,'/node/',rivername,'_drift_node_geom.csv'),append=TRUE,row.names=FALSE)
-write.csv(reach_geom,paste0(output_directory,'/reach/',rivername,'_drift_reach_geom.csv'),append=TRUE,row.names=FALSE)
-write.csv(node_wses,paste0(output_directory,'/node/',rivername,'_drift_node_wses.csv'),append=TRUE,row.names=FALSE)
-write.csv(reach_stats,paste0(output_directory,'/reach/',rivername,'_drift_reach_wse_slope.csv'),append=TRUE,row.names=FALSE)}
+write.table(node_geom,paste0(output_directory,'/node/',rivername,'_drift_node_geom.csv'),append=TRUE,row.names=FALSE, sep=',')
+write.table(reach_geom,paste0(output_directory,'/reach/',rivername,'_drift_reach_geom.csv'),append=TRUE,row.names=FALSE, sep=',')
+write.table(node_wses,paste0(output_directory,'/node/',rivername,'_drift_node_wses.csv'),append=TRUE,row.names=FALSE, sep=',')
+write.table(reach_stats,paste0(output_directory,'/reach/',rivername,'_drift_reach_wse_slope.csv'),append=TRUE,row.names=FALSE, sep=',')}
         
         })
 

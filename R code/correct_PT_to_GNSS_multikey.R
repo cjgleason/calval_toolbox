@@ -16,7 +16,6 @@ library(lubridate)
     
   pt_serial_file=as.integer(read.table(paste0(pt_data_directory,raw_pt_file), header = FALSE, nrow = 1)$V1) 
 
-   
     #read in master_key--------------
     keyfile=master_key%>%
       mutate('driftID_install'= sub("\\..*","",Final_Install_Log_File))%>%
@@ -26,7 +25,6 @@ library(lubridate)
     #check for a serial match-----------
     if( pt_serial_file %in% keyfile$pt_serial == FALSE){return(NA)}
    
-    print(paste0(pt_data_directory,raw_pt_file))
     #now get the PT data, standardized(ish) by Taylor--------
     tryCatch({
     pt_data=read.csv(paste0(pt_data_directory,raw_pt_file),skip=10,header=TRUE) %>%
@@ -34,7 +32,7 @@ library(lubridate)
     },
         error=function(cond){return(NA)})
           #cleanup
-    
+   
     filename=raw_pt_file  
     filename_base=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/')[[1]])])
     filename=paste0(filename_base,'_',unique(pt_data$keyid))
@@ -73,11 +71,11 @@ library(lubridate)
           pt_data=pt_data%>%
         mutate(pt_data,datetime=as.POSIXct(paste(Date,Time),format= "%Y/%m/%d %H:%M:%S"))
       }
-         
-
+        
   #left joining the key in 'offset' gets us a tidy data frame where the info from the key is
     #promulgated to just that pt. a right join would give
     #an n fold expansion across n pts
+    #Added reach ID to plot
     pt_data=pt_data %>%
       left_join(keyfile,by='pt_serial')  %>%
     mutate(pt_Lat= Lat_WGS84)%>%
@@ -85,6 +83,7 @@ library(lubridate)
       mutate(pt_time_UTC=datetime)%>%
       filter(pt_serial==pt_serial_file)%>% #limit to just the PT we want. The filter above should take care 
     #of the case where the serial is not in the key file
+    # This is where the Munged_PT columns come from key file - 12/20 added reach and nodeID
     transmute(pt_time_UTC=pt_time_UTC,pt_lat=pt_Lat,pt_lon=pt_Lon,
      pt_install_UTC=as.POSIXct(paste(Date_PT_Install,Time_PT_Install_UTC),format= "%m/%d/%Y %H:%M"),
      pt_uninstall_UTC=as.POSIXct(paste(Date_PT_Uninstall,Time_PT_Uninstall_UTC),format= "%m/%d/%Y %H:%M"),
@@ -94,13 +93,13 @@ library(lubridate)
          pt_level=Level,temperature=Temperature,
               driftID_install=driftID_install,driftID_uninstall=driftID_uninstall,
               datetime=datetime,
-              keyid=keyid, Date_GNSS_Install=Date_GNSS_Install,Date_GNSS_Uninstall=Date_GNSS_Uninstall) %>%
+              keyid=keyid, Date_GNSS_Install=Date_GNSS_Install,Date_GNSS_Uninstall=Date_GNSS_Uninstall, Reach_ID=Reach_ID, Node_ID=Node_ID) %>%
     filter(pt_time_UTC >= pt_install_UTC)%>%
-    filter(pt_time_UTC <= pt_uninstall_UTC)
+    filter(pt_time_UTC <= pt_uninstall_UTC)%>%
+    filter(pt_level >= dry_threshold)# limit for dry here with a filter in this pipe - must check that dates are ok
     
     ### Test here for pt checking of second condition ###
-  
-    
+
     if(nrow(pt_data)==0){
           clean_pt='the keyfile says this pt was never in the water. KEYFILE ERROR'
                 write.csv(clean_pt,file=paste0(flagged_pt_output_directory,filename))
@@ -259,23 +258,40 @@ getit_positive=function(longstring, shortstrings){
       #now, multiple gnss points go to one pt. Need to group by pt timestep and apply the correction at that level
       #the differences in these offsets is the uncertainty of this mapping
     
-    #also, we need to group by the keyfile we're using. different keyfiles have different offsets!!!
-      offset_pt_mean=clean_pt%>%
-        group_by(pt_time_UTC,keyid)%>%
-        mutate( offset=(gnss_wse-pt_level))%>%
-        summarize(pt_correction= mean(offset))
+#also, we need to group by the keyfile we're using. different keyfiles have different offsets!!!
+  offset_pt_mean=clean_pt%>%
+    group_by(pt_time_UTC,keyid)%>%
+    mutate( offset=(gnss_wse-pt_level))%>%
+    summarize(pt_correction= mean(offset))
+
+  offset_pt_sd =clean_pt%>%
+  group_by(pt_time_UTC,keyid)%>%
+    mutate( offset=(gnss_wse-pt_level))%>%
+    summarize(pt_correction_sd=sd(offset))
+
+wse_pt=clean_pt%>%
+  left_join(offset_pt_mean,by=c('pt_time_UTC','keyid'))%>%
+  left_join(offset_pt_sd,by=c('pt_time_UTC','keyid'))%>%
+  mutate(pt_wse=pt_level+pt_correction)%>%
+  mutate(pt_wse_sd= pt_correction_sd + 0.001) #sets the uncertainty to equal to the variance in all of the offsets used to create the
+
     
-      offset_pt_sd =clean_pt%>%
-      group_by(pt_time_UTC,keyid)%>%
-        mutate( offset=(gnss_wse-pt_level))%>%
-        summarize(pt_correction_sd=sd(offset))
-      
-      wse_pt=clean_pt%>%
-        left_join(offset_pt_mean,by=c('pt_time_UTC','keyid'))%>%
-        left_join(offset_pt_sd,by=c('pt_time_UTC','keyid'))%>%
-        mutate(pt_wse=pt_level+pt_correction)%>%
-        mutate(pt_wse_sd= pt_correction_sd + 0.001) #sets the uncertainty to equal to the variance in all of the offsets used to create the 
-    
+#       offset_pt_mean=clean_pt%>%
+#         group_by(pt_time_UTC)%>%
+#         mutate( offset=(gnss_wse-pt_level))%>%
+#         summarize(pt_correction= mean(offset))
+
+#       offset_pt_sd =clean_pt%>%
+#       group_by(pt_time_UTC)%>%
+#         mutate( offset=(gnss_wse-pt_level))%>%
+#         summarize(pt_correction_sd=sd(offset))
+
+#       wse_pt=clean_pt%>%
+#         left_join(offset_pt_mean,by=c('pt_time_UTC'))%>%
+#         left_join(offset_pt_sd,by=c('pt_time_UTC'))%>%
+#         mutate(pt_wse=pt_level+pt_correction)%>%
+#         mutate(pt_wse_sd= pt_correction_sd + 0.001) #sets the uncertainty to equal to the variance in all of the offsets used to create the
+
 
     #split into multiple files based on the keyids
     final_pt_data_frames=split(wse_pt,wse_pt$keyid)
@@ -290,9 +306,6 @@ getit_positive=function(longstring, shortstrings){
                     clean_pt='there are no gnss points to make a correction with. The thresholds that define -close enough- between GNSS and pt arent met'
                 write.csv(clean_pt,file=paste0(flagged_pt_output_directory,filename))
             return(NA)}
-          # 
-
-
           if (nrow(wse_pt)<5 ){
               flag=flag+10
             # print(filename)
@@ -302,7 +315,8 @@ getit_positive=function(longstring, shortstrings){
             # write.csv(offset_pt,file=paste0(flagged_pt_output_directory,filename))
             # return(NA)
           }
-
+      
+      # final_pt=mutate(wse_pt,flag=flag)
 
           #first strip the offset df into just the gnss time and the pt correction and SD
 
@@ -310,21 +324,25 @@ getit_positive=function(longstring, shortstrings){
     mutate(pt_time_UTC=as.POSIXct(pt_time_UTC,format ="%Y-%m-%d %H:%M:%S"))%>%
     group_by(pt_time_UTC)%>%
     summarise(pt_time_UTC=first(pt_time_UTC),pt_correction=first(pt_correction),pt_wse_sd=first(pt_wse_sd))
- 
+    
     find_closest_ping=function(pt_df,offset_df){
-        time_diff= as.POSIXct(pt_df['pt_time_UTC'])- offset_df$pt_time_UTC
+       time_diff= as.POSIXct(pt_df['pt_time_UTC'])- offset_df$pt_time_UTC
        time_index= first(which (abs(time_diff) == min(abs(time_diff),na.rm=TRUE)))
+    
+    
         correct_ping=offset_df[time_index,]%>%
         transmute(ping_time_UTC=pt_time_UTC,pt_correction=pt_correction,pt_wse_sd=pt_wse_sd)
         }
     
     correct_pings=do.call(rbind,apply(pt_data,1,find_closest_ping,offset_df=svelte_offset_pt))
-    
+
     final_pt=cbind(pt_data,correct_pings)%>%
             mutate(pt_wse=pt_level+pt_correction)%>%
             mutate(sigma_pt_correction_m=sd(pt_correction))%>%
-            mutate(flag=flag)
-    #this is a weighted variance of allt he corrections that were applied. There may be only 1-5 corrections ('ping times'), but if e.g. a value is only applied to one PT time then it isn't really affecting the PT record that much. Instead of flagging this, we pass this to the PT file.       
+    mutate(flag=flag)
+    #this is a weighted variance of allt he corrections that were applied. There may be only 1-5 corrections ('ping times'), 
+    #but if e.g. a value is only applied to one PT time then it isn't really affecting the PT record that much. Instead of flagging this, 
+    #we pass this to the PT file.       
 
           print(filename)
           print('this file passed all checks')
