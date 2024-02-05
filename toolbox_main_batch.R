@@ -14,6 +14,7 @@ toolbox_main_batch=function(hubname,
                            GNSS_sd_thresh,
                            offset_sd_thresh,
                            change_thresh_15_min,
+                           dry_threshold,
                            alongstream_error,
                            crossstream_error,
                            measurement_error, 
@@ -44,6 +45,7 @@ if(reprocess_switch==1){
     
     drift_string= paste0('Munged drifts/','reprocessed_',  str_replace_all(as.character(Sys.Date()),'\\-','_'))
     PT_string =paste0('Munged PT/','reprocessed_',  str_replace_all(as.character(Sys.Date()),'\\-','_'))
+    PT_string_flyby=paste0('Flyby PT/','reprocessed_',  str_replace_all(as.character(Sys.Date()),'\\-','_'))
     reachnode_string= paste0('Data frames/','reprocessed_',  str_replace_all(as.character(Sys.Date()),'\\-','_'))
     node_string =paste0('Data frames/','reprocessed_',  str_replace_all(as.character(Sys.Date()),'\\-','_'),'/node')
     reach_string=paste0('Data frames/','reprocessed_',  str_replace_all(as.character(Sys.Date()),'\\-','_'),'/reach')
@@ -70,14 +72,15 @@ if(reprocess_switch==1){
   # Define directories if nothing was deleted  
         QA_QC_drift_output_directory=paste0(drift_string,'/')
         QA_QC_PT_output_directory=paste0(PT_string,'/')
+        QA_QC_PT_flyby_output_directory=paste0(PT_string_flyby,'/')
         reachnode_output_directory=paste0(reachnode_string,'/')
         flagged_PT_output_directory=paste0(flagged_PT_output_directory,'/')
     }
     else {
-    #check if we've already reprocessed today
+    # #check if we've already reprocessed today
     # if (dir.exists(drift_string)){
     #     #if we have, then use that as the output and clear the files in the drift directory
-    #     unlink(drift_string, recursive = TRUE)
+    #     unlink(drift_string,recursive = TRUE)
     #     unlink(PT_string,recursive = TRUE)
     #     unlink(flagged_PT_output_directory,recursive = TRUE)
     #     dir.create(drift_string)
@@ -93,6 +96,7 @@ if(reprocess_switch==1){
         dir.create(flagged_PT_output_directory)
     dir.create(drift_string)
     dir.create(PT_string)
+    dir.create(PT_string_flyby)
     dir.create(reachnode_string)
     dir.create(node_string)
     dir.create(reach_string)
@@ -101,8 +105,8 @@ if(reprocess_switch==1){
     QA_QC_drift_output_directory=paste0(drift_string,'/')
     reachnode_output_directory=paste0(reachnode_string,'/')
     QA_QC_PT_output_directory=paste0(PT_string,'/')
+    QA_QC_PT_flyby_output_directory=paste0(PT_string_flyby,'/')
     }
-    
 } else { #we aren't reprocessing. find the most recent folders to use
     
 folderlist= list.files('Munged drifts',full.names = TRUE)
@@ -136,8 +140,16 @@ foldertimes4=file.info(folderlist4)%>%
  filter(mintime== min(mintime))  
     
 flagged_PT_output_directory=paste0(row.names(foldertimes4),'/') 
+    
+folderlist5= list.files('Flyby PT',full.names = TRUE)
+    
+foldertimes5=file.info(folderlist5)%>%
+ mutate(mintime= Sys.time()-mtime) %>%
+ filter(mintime== min(mintime))  
+    
+QA_QC_PT_flyby_output_directory=paste0(row.names(foldertimes5),'/') 
 }
-
+    
 flagged_drift_output_directory='Flagged drifts/'
 #--------------------------------------------------
 
@@ -198,34 +210,37 @@ print('ending drift munging')
     
     
 #munge PTs if needed------
-source('/nas/cee-water/cjgleason/calval_toolbox/R code/correct_PT_to_GNSS_multikey.R')
+source('/nas/cee-water/cjgleason/calval_toolbox/R code/correct_PT_to_GNSS_occupy_only.R')
 if (process_PTs==1){
-    print('starting PT munging')
-# dist_thresh=150 # 150m
-# time_thresh= 15*60 #minutes as seconds, centered, so 15 =30 mins total time
-# GNSS_sd_thresh=0.15 # 15cm how much variance do you want in the GNSS data when it is within the distance threshold?
+dist_thresh=150 # 150m
+time_thresh= 15*60 #minutes as seconds, centered, so 15 =30 mins total time
+GNSS_sd_thresh=0.05 # 15cm how much variance do you want in the GNSS data when it is within the distance threshold?
 # offset_sd_thresh=0.10 #m, so 10cm. the the PT apparantly shift by more than a cm?
-# change_thresh_15_min=0.05#m- does it change more than 5cm in 15 minutes? that is a discontinuity in offset
-
+change_thresh_15_min=0.15#m- does it change more than 5cm in 15 minutes? that is a discontinuity in offset
+dry_threshold = 0.10 #This is a raw pt level where anything below is considered a PT out of water - this can change if we want
 #first, move .csv files with an 'L1' in them over to the PT_data_directory
 munged_files= list.files(PT_data_directory,
                          recursive= TRUE)
-
+    
 PT_index=which(!is.na(do.call(rbind,lapply(munged_files,str_match,'PT_L1'))))
 PT_files=munged_files[PT_index]
 csv_index=which(!is.na(do.call(rbind,lapply(PT_files,str_match,'.csv'))))
 raw_PT_files=PT_files[csv_index]
 
-#open the key files   
+#open the key files   - Taylor added column labels and way to handle blank cells to make as NA
+
 read_keys=function(keyfile){
-   this_key= read.csv(keyfile,stringsAsFactors=FALSE, na.strings = c("","NA","na","NaN", " "))%>%
+    
+    # Read in key file and check column names and NODE ID for precision lost with scientific notation #
+  this_key= read.csv(keyfile,stringsAsFactors=FALSE, na.strings = c("","NA","na","NaN", " "))%>%
     mutate(keyid=keyfile)%>%
     mutate(pt_serial=as.integer(PT_Serial))
+    
     }
     
+### Key file get and check ###    
 master_key= do.call(rbind,lapply(PT_key_file,read_keys))
-
-# Key file QA/QC check #
+    # key_file column names to check against (keyfile and pt_serial are added in this process, do not add to original key files)#
 key_col_names = c("PT_Serial", "Label", "Baro_Comp", "Node_ID", "Reach_ID", "US_Reach_ID", 
                       "DS_Reach_ID", "Lat_WGS84", "Long_WGS84", "Install_method",
                       "Date_PT_Install", "Time_PT_Install_UTC", "Date_PT_Uninstall",
@@ -250,25 +265,20 @@ key_check <- function(key_col_names, hub_key_colnames){
 }
 
 key_check(key_col_names,hub_key_colnames)
-    
-#three key info here-
-    #1 PTs in the key
-    #2 unmunged PTs
-    #3 QA QC PTs
-    #4 flagged PTs
-    
-    #3 + 4 are processed files
-    
+    #Checks what files have been processed in munged and flagged folders
+
 getit_processed=function(inputstring){   
     output=paste(strsplit(inputstring,'_')[[1]][1:8],collapse='_')
     output=sub("\\..*","",output)
+        
 }
-    
+    # Checks which file names exist in the master key
 getit_key =function(inputstring){   
     output=paste(c('SWOTCalVal',rivername,'PT','L1',inputstring),collapse='_')
     output=sub("\\..*","",output)
-}
     
+}
+  
 getit_negative=function(longstring, shortstrings){
     #search for a pattern between one and many strings with partial matches allows
         output=!any(str_detect(longstring,shortstrings)  )
@@ -281,58 +291,50 @@ getit_positive=function(longstring, shortstrings){
        
 processed_files= do.call(rbind,lapply(c(list.files(QA_QC_PT_output_directory),list.files(flagged_PT_output_directory)),getit_processed))
 key_files=do.call(rbind,lapply(master_key$Label,getit_key))
-
+    
     if (is.null(processed_files)){unprocessed_files=raw_PT_files}else{
 unprocessed_files=raw_PT_files[do.call(rbind,lapply(raw_PT_files,getit_negative,processed_files))]}
 in_key_unprocessed=unprocessed_files[do.call(rbind,lapply(unprocessed_files,getit_positive,key_files))]
-
-# print('raw')
-# print(raw_PT_files)
-# print('processed')
-# print(processed_files)
-# print('unprocessed')
-# print(unprocessed_files)
-# print('unprocessed in key')
-# print(in_key_unprocessed)
-
+ # print(in_key_unprocessed)
+  
     
-for(thisone in in_key_unprocessed){
+#for(thisone in in_key_unprocessed){
 
-        correct_pt_to_gnss_multikey(thisone,
+        dummy = lapply(in_key_unprocessed,correct_PT_to_GNSS_occupy_only,
                   master_key=master_key,
-                  dist_thresh=dist_thresh_offset,
-                  time_thresh=time_thresh_offset,
+                  dist_thresh=dist_thresh,
+                  time_thresh=time_thresh,
                   pt_data_directory=PT_data_directory,
                   gnss_drift_data_directory=QA_QC_drift_output_directory,
-                  QA_QC_pt_output_directory=QA_QC_PT_output_directory,
+                  QA_QC_PT_output_directory=QA_QC_PT_output_directory,
                   flagged_pt_output_directory=flagged_PT_output_directory,
                   gnss_sd_thresh=GNSS_sd_thresh,
                   offset_sd_thresh=offset_sd_thresh,
-                  change_thresh_15_min=change_thresh_15_min) 
-}
-    
-    
-    
-#       cl=makeCluster(40,type='FORK')
-#   dummy=parLapply(cl, in_key_unprocessed,correct_pt_to_gnss_multikey,
-#                    master_key=master_key,
-#                   dist_thresh=dist_thresh_offset,
-#                   time_thresh=time_thresh_offset,
-#                   pt_data_directory=PT_data_directory,
-#                   gnss_drift_data_directory=QA_QC_drift_output_directory,
-#                   QA_QC_pt_output_directory=QA_QC_PT_output_directory,
-#                   flagged_pt_output_directory=flagged_PT_output_directory,
-#                   gnss_sd_thresh=GNSS_sd_thresh,
-#                   offset_sd_thresh=offset_sd_thresh,
-#                   change_thresh_15_min=change_thresh_15_min) 
-#   stopCluster(cl)
-    
-    
-    print('ending PT processing')
+                  change_thresh_15_min=change_thresh_15_min,
+                  dry_threshold = dry_threshold) 
     
     }#end if process PT
- 
-    
+   print('ending PT processing')
+ ### FLYBY OFFSETS ###
+source('/nas/cee-water/cjgleason/calval_toolbox/R code/correct_PT_via_flyby.R')
+
+ print("starting flyby offset calculation")
+
+munged_PT_directory= QA_QC_PT_output_directory
+output_dir=QA_QC_PT_flyby_output_directory
+pt_file_in=list.files(munged_PT_directory)
+munged_GNSS_directory=QA_QC_drift_output_directory
+gnss_sd_thresh=0.05
+time_thresh=7.5*60
+dist_thresh=200
+
+lapply(pt_file_in,correct_PT_via_flyby,
+       munged_GNSS_directory=munged_GNSS_directory,
+       munged_PT_directory=munged_PT_directory,
+       time_thresh=time_thresh,
+       dist_thresh=dist_thresh,
+       gnss_sd_thresh=gnss_sd_thresh,
+       output_dir=output_dir)   
     
   #calculate slopes and heights from drifts within nodes and reaches------
 print('starting drift dataframe creation')
@@ -367,16 +369,16 @@ print('ending drift dataframe creation')
 if (process_PTs==1){
     
     print('starting pt dataframe creation')
-PT_files=paste0(QA_QC_PT_output_directory,list.files(QA_QC_PT_output_directory))
+PT_files=paste0(QA_QC_PT_flyby_output_directory,list.files(QA_QC_PT_flyby_output_directory))
 SWORD_reach= read.csv(domain_file)
 this_river_reach_IDs= as.numeric(as.character(unique(SWORD_reach$Reach_ID)))
-
+this_river_node_IDs= as.numeric(unique(SWORD_reach$Node_ID[!is.na(SWORD_reach$Node_ID)]))
  
 
 # alongstream_error= 0.0001*200 #m error we get from the downstream slope of a reach in a node. This placeholder is a 1e-4 slope over a 200m node
 # crossstream_error= 0.005 #m error we get from PT not representing cross stream superelevation/noise in a node
 # measurement_error= 0.001 #m error we get from PT measurement itself 
-source('/nas/cee-water/cjgleason/calval_toolbox/R code/calculate_slope_wse_fromPT.R')
+source('/nas/cee-water/cjgleason/calval_toolbox/R code/calculate_slope_wse_fromPT_flybys.R')
 
 read_keys=function(keyfile){
    this_key= read.csv(keyfile,stringsAsFactors=FALSE, na.strings = c("","NA","na","NaN", " "))%>%
@@ -386,7 +388,7 @@ read_keys=function(keyfile){
     
 master_key= do.call(rbind,lapply(PT_key_file,read_keys))
 
-dummy=calculate_slope_wse_fromPT(keyfile=master_key,
+dummy=calculate_slope_wse_fromPT_flybys(keyfile=master_key,
                                  pt_files=PT_files,
                                  SWORD_path=SWORD_path,
                                  SWORD_reach=SWORD_reach,
@@ -408,16 +410,15 @@ print('ending pt dataframe creation')
 #SWOT_L2_HR_RiverSP_<FileIdentifier>_<CycleID>_<PassID>_<ContinentID>_<RangeBeginningDateTime>_<RangeEndingDateTime>_<CRID>_<ProductCounter>.<extension> 
 
 if (process_PTs ==1){
-    print('starting matching')
-passfile=paste0('/nas/cee-water/cjgleason/calval/Processed data/riversp_list_clean_',rivername,'_20231102.txt')
+passfile=paste0('/nas/cee-water/cjgleason/calval/Processed data/riversp_list_clean_',rivername,'_20240201.txt')
 
  
 passnames=read.delim(passfile,header=F)$V1
  
   
-# time_threshold_sec= 120*60 #two hour
-# wse_threshold_m=0.05 #within 5cm
-# distance_threshold_m =200 #within 200m
+time_threshold_sec= 120*60 #two hour
+wse_threshold_m=0.05 #within 5cm
+distance_threshold_m =200 #within 200m
 
 if (!dir.exists(paste0('Matched_drifts/','processed_',str_replace_all(as.character(Sys.Date()),'\\-','_')))){
     dir.create(paste0('Matched_drifts/','processed_',str_replace_all(as.character(Sys.Date()),'\\-','_')))}
@@ -425,7 +426,7 @@ if (!dir.exists(paste0('Matched_drifts/','processed_',str_replace_all(as.charact
 
 matched_output_directory= paste0('Matched_drifts/','processed_',str_replace_all(as.character(Sys.Date()),'\\-','_'),'/')
 munged_drift_directory= QA_QC_drift_output_directory
-munged_pt_directory=paste0(working_dir,QA_QC_PT_output_directory)
+flyby_pt_directory=paste0(working_dir,QA_QC_PT_flyby_output_directory)
 
 source('/nas/cee-water/cjgleason/calval_toolbox/R code/select_appropriate_drift.R')
 
@@ -443,14 +444,15 @@ for (i in 1:length(passnames)){
                                drift_node_directory= paste0(reachnode_output_directory,'/node/'),
                                munged_drift_directory=munged_drift_directory,
                                matched_output_directory=matched_output_directory,
-                               munged_pt_directory=munged_pt_directory,
-                               time_threshold_sec=time_threshold_sec_match,
-                               wse_threshold_m= wse_threshold_m_match,
-                               distance_threshold_m=distance_threshold_m_match,
+                               flyby_pt_directory=flyby_pt_directory,
+                               time_threshold_sec=time_threshold_sec,
+                               wse_threshold_m= wse_threshold_m,
+                               distance_threshold_m=distance_threshold_m,
                                keyfile=master_key,
                                rivername=rivername)
     
     }
+
 
   #too memory intensive to parallize. Need to properly paralellize via rslurm to send across the cluster 
     #rahter than a single node like this
@@ -526,15 +528,6 @@ stopCluster(cl)
 
     
     
+      
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    }
+}

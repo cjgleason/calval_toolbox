@@ -1,6 +1,6 @@
 correct_pt_to_gnss_multikey= function(raw_pt_file,master_key,dist_thresh,time_thresh,pt_data_directory,
                              gnss_drift_data_directory,QA_QC_pt_output_directory, flagged_pt_output_directory,
-                             gnss_sd_thresh,offset_sd_thresh,change_thresh_15_min){
+                             gnss_sd_thresh,offset_sd_thresh,change_thresh_15_min,dry_threshold){
 library(dplyr)
 library(stringr)
 library(tidyr)
@@ -15,7 +15,7 @@ library(lubridate)
     #Creates the PT record as WSE instead of level. Uses multiple key files in cases where PTs went in and out of the water.
     
   pt_serial_file=as.integer(read.table(paste0(pt_data_directory,raw_pt_file), header = FALSE, nrow = 1)$V1) 
-
+ 
     #read in master_key--------------
     keyfile=master_key%>%
       mutate('driftID_install'= sub("\\..*","",Final_Install_Log_File))%>%
@@ -36,7 +36,6 @@ library(lubridate)
     filename=raw_pt_file  
     filename_base=sub("\\..*","",strsplit(filename,'/')[[1]][length(strsplit(filename,'/')[[1]])])
     filename=paste0(filename_base,'_',unique(pt_data$keyid))
-    
     
    if(!is.na(str_match(pt_data$Date[1],'UNIT') )){
             clean_pt='this PT has header issues related to the HTC version'
@@ -76,6 +75,7 @@ library(lubridate)
     #promulgated to just that pt. a right join would give
     #an n fold expansion across n pts
     #Added reach ID to plot
+    
     pt_data=pt_data %>%
       left_join(keyfile,by='pt_serial')  %>%
     mutate(pt_Lat= Lat_WGS84)%>%
@@ -83,11 +83,13 @@ library(lubridate)
       mutate(pt_time_UTC=datetime)%>%
       filter(pt_serial==pt_serial_file)%>% #limit to just the PT we want. The filter above should take care 
     #of the case where the serial is not in the key file
-    # This is where the Munged_PT columns come from key file - 12/20 added reach and nodeID
+    # This is where the Munged_PT columns come from key file - 12/20 added reach and nodeID. 1/05 added gnss install end and gnss uninstall start to limit
     transmute(pt_time_UTC=pt_time_UTC,pt_lat=pt_Lat,pt_lon=pt_Lon,
      pt_install_UTC=as.POSIXct(paste(Date_PT_Install,Time_PT_Install_UTC),format= "%m/%d/%Y %H:%M"),
      pt_uninstall_UTC=as.POSIXct(paste(Date_PT_Uninstall,Time_PT_Uninstall_UTC),format= "%m/%d/%Y %H:%M"),
      gnss_install_UTC=as.POSIXct(paste(Date_GNSS_Install,Time_GNSS_Install_Start_UTC),format= "%m/%d/%Y %H:%M"),
+     gnss_install_UTC_end = as.POSIXct(paste(Date_GNSS_Install,Time_GNSS_Install_End_UTC),format= "%m/%d/%Y %H:%M"),
+     gnss_uninstall_UTC_start = as.POSIXct(paste(Date_GNSS_Uninstall,Time_GNSS_Uninstall_Start_UTC),format= "%m/%d/%Y %H:%M"), 
      gnss_uninstall_UTC=as.POSIXct(paste(Date_GNSS_Uninstall,Time_GNSS_Uninstall_End_UTC),format= "%m/%d/%Y %H:%M"),
          install_method=Install_method, pt_serial=pt_serial,         
          pt_level=Level,temperature=Temperature,
@@ -97,7 +99,7 @@ library(lubridate)
     filter(pt_time_UTC >= pt_install_UTC)%>%
     filter(pt_time_UTC <= pt_uninstall_UTC)%>%
     filter(pt_level >= dry_threshold)# limit for dry here with a filter in this pipe - must check that dates are ok
-    
+   
     ### Test here for pt checking of second condition ###
 
     if(nrow(pt_data)==0){
@@ -122,9 +124,6 @@ library(lubridate)
         }
     
     ### An exception to handle when install time is not in PT file, 15 minutes is added to start GNSS occupy time to encompass PT click ###
-    # print(pt_data[1,]$gnss_install_UTC + minutes(15))
-    # print(pt_data[1,]$pt_time_UTC)
-    # bonk
     
     if((as.POSIXct(pt_data[1,]$gnss_install_UTC + minutes(15)) < as.POSIXct(pt_data[1,]$pt_time_UTC))){
         clean_pt='the keyfile indicates the install time did not occur within the PT data range, fix key file'
@@ -134,13 +133,13 @@ library(lubridate)
   
     if (is.na(pt_data[1,]$Date_GNSS_Uninstall)){ #in the case where there is no uninstall
     pt_data_for_offset =pt_data%>%
-#         #taylor says we can throw out all the data before and after the GNSS install, but i don't want to lose the 'approach' time
+#         #taylor says we can throw out all the data before and after the GNSS install, but i don't want to lose the 'approach' time - I think we need to toss approach/
         #### Are we filtering by GNSS install/unintsall or PT install/uninstall??? ####
 #     #comjpromise is to filter by DATE, not DATETIME
     filter(pt_time_UTC >= as.POSIXct(paste0(Date_GNSS_Install,' 00:00:00'),format= "%m/%d/%Y %H:%M:%S"))%>%
     # filter(case_when(!is.na(Date_GNSS_Uninstall)~ pt_time_UTC <= as.POSIXct(Date_GNSS_Uninstall,format= "%m/%d/%Y"))) %>% 
-     dplyr::select(-Date_GNSS_Uninstall,-Date_GNSS_Install)}else{
-        
+     dplyr::select(-Date_GNSS_Uninstall,-Date_GNSS_Install)}
+    else{
             pt_data_for_offset =pt_data%>%
     filter(pt_time_UTC >= as.POSIXct(paste0(Date_GNSS_Install,' 00:00:00'),format= "%m/%d/%Y %H:%M:%S"))%>%
     filter(pt_time_UTC <= as.POSIXct(paste0(Date_GNSS_Uninstall,' 23:59:59'),format= "%m/%d/%Y %H:%M:%S")) %>% 
@@ -189,19 +188,18 @@ getit_positive=function(longstring, shortstrings){
        correct_drift_index=which(!is.na(str_match(list.files(gnss_drift_data_directory),string_to_match)))
        driftstring=list.files(gnss_drift_data_directory,full.names=TRUE)[correct_drift_index]
 
-        
-        
+  
         if(length(driftstring)>1){#we want the most recent
             split2=as.POSIXct(paste0(substring(do.call(rbind,strsplit(driftstring,'_'))[,11],1,8),substring(do.call(rbind,strsplit(driftstring,'_'))[,11],10,15) ),
                               format='%Y%m%d%H%M%S')
             
            latest_file_index=which(split2==max(split2))
-            #position 11 is the munge date. Take the most recent
+            #position 11 is the version munge date. Take the most recent
     
             driftstring=driftstring[latest_file_index]
 
             }
-       
+     
             read_multi_gnss=function(driftstring){
                 output=read.csv(driftstring,header=TRUE,stringsAsFactors = FALSE)
                 }
@@ -220,32 +218,31 @@ getit_positive=function(longstring, shortstrings){
     
   gnss_log=do.call(rbind,lapply(splitter,get_all_gnss))
     
-    
+  ### 1/05 I am not convinced this is working for all key files at once...
     #double handle. above we determined that there aren't gnss data ready for this yet, but it returned an 
     #NA to here, which was writing teh file correctly and then bonking here. 
      if(all(is.na(gnss_log))){
          return(NA)} 
-    
 
     #now, join the GNSS 1Hz data to the PT 15 minute data - 10/26 may need to make this ignore seconds in pt file - dies during PD335 file at 1 minute data
     clean_pt_time=difference_inner_join(pt_data_for_offset,gnss_log,by='datetime',max_dist=time_thresh,distance_col='test')
-     
+    
     #need lon then lat
     distance_m=geodist(cbind(clean_pt_time$pt_lon, clean_pt_time$pt_lat),    cbind(clean_pt_time$gnss_Lon, clean_pt_time$gnss_Lat), paired=TRUE,measure='haversine')
 
     clean_pt=cbind(clean_pt_time,distance_m)%>%
-    filter(distance_m<dist_thresh)%>%
+    filter(distance_m<dist_thresh)%>% ### 1/05 - We should remove the distance and time threshold and use install/unintstall GNSS times
         #ok, let's dplyr::select for stuff we want to keep now
-    transmute(pt_level=pt_level, temperature=temperature,gnss_time_UTC=as.POSIXct(gnss_time_UTC,format ="%Y-%m-%d %H:%M:%S"),gnss_wse=gnss_wse,pt_time_UTC=pt_time_UTC,
+    transmute(pt_level=pt_level, temperature=temperature,gnss_time_UTC=as.POSIXct(gnss_time_UTC,format ="%Y-%m-%d %H:%M:%S"),
+                  gnss_wse=gnss_wse,pt_time_UTC=pt_time_UTC,
                   pt_serial=pt_serial,
                   gnss_lat=gnss_Lat, gnss_lon=gnss_Lon, pt_lat=pt_lat, pt_lon=pt_lon,
                   gnss_pt_dist_m=distance_m ,keyid=keyid, pt_install_UTC=pt_install_UTC,
-                  pt_uninstall_UTC=pt_uninstall_UTC)
-   
+                  pt_uninstall_UTC=pt_uninstall_UTC,gnss_uncertainty_m=gnss_uncertainty_m)
+  
     #if we want to filter to just times covered by the install and uninstall, we'd do so with 
     #a pipe here. Currently not doing that as we want to check in the middle for changes.
-    
-      #next, ensure there are enough gnss points to make a valid offset correction
+    #next, ensure there are enough gnss points to make a valid offset correction
       if(nrow(clean_pt)==0){
      
          # bonk
@@ -262,96 +259,135 @@ getit_positive=function(longstring, shortstrings){
   offset_pt_mean=clean_pt%>%
     group_by(pt_time_UTC,keyid)%>%
     mutate( offset=(gnss_wse-pt_level))%>%
-    summarize(pt_correction= mean(offset))
+    summarize(pt_correction= mean(offset,na.rm=TRUE),
+              pt_correction_sd=  sqrt( sd(offset,na.rm=TRUE)^2 +sd(gnss_uncertainty_m)^2 ),
+              pt_correction_wse_sd_m=sd(offset,na.rm=TRUE),
+              pt_correction_gnss_sd_m=sd(gnss_uncertainty_m)) 
 
-  offset_pt_sd =clean_pt%>%
-  group_by(pt_time_UTC,keyid)%>%
-    mutate( offset=(gnss_wse-pt_level))%>%
-    summarize(pt_correction_sd=sd(offset))
-
-wse_pt=clean_pt%>%
-  left_join(offset_pt_mean,by=c('pt_time_UTC','keyid'))%>%
-  left_join(offset_pt_sd,by=c('pt_time_UTC','keyid'))%>%
-  mutate(pt_wse=pt_level+pt_correction)%>%
-  mutate(pt_wse_sd= pt_correction_sd + 0.001) #sets the uncertainty to equal to the variance in all of the offsets used to create the
-
-    
-#       offset_pt_mean=clean_pt%>%
-#         group_by(pt_time_UTC)%>%
-#         mutate( offset=(gnss_wse-pt_level))%>%
-#         summarize(pt_correction= mean(offset))
-
-#       offset_pt_sd =clean_pt%>%
-#       group_by(pt_time_UTC)%>%
-#         mutate( offset=(gnss_wse-pt_level))%>%
-#         summarize(pt_correction_sd=sd(offset))
-
-#       wse_pt=clean_pt%>%
-#         left_join(offset_pt_mean,by=c('pt_time_UTC'))%>%
-#         left_join(offset_pt_sd,by=c('pt_time_UTC'))%>%
-#         mutate(pt_wse=pt_level+pt_correction)%>%
-#         mutate(pt_wse_sd= pt_correction_sd + 0.001) #sets the uncertainty to equal to the variance in all of the offsets used to create the
-
+  # offset_pt_sd =clean_pt%>%
+  # group_by(pt_time_UTC,keyid)%>%
+  #   mutate( offset=(gnss_wse-pt_level))%>%
+  #   summarize(,na.rm=TRUE)
+  
+  #clean_pt is the tidyied up PT file that keeps only the observations within some time and distance threshold to a GNSS ping
+  #commenting new code on 12/21/23 to remove confusion. The wse was calculated, but this wasn't the whole record so it is moot.
+  #we just need the correction here
+correction_file_pt=clean_pt%>%
+  left_join(offset_pt_mean,by=c('pt_time_UTC','keyid'))#%>%
+  #left_join(offset_pt_sd,by=c('pt_time_UTC','keyid'))%>%
+  # mutate(pt_wse=pt_level+pt_correction)%>%
+  # mutate(pt_wse_sd= pt_correction_sd + 0.001) #sets the uncertainty to equal to the variance in all of the offsets used to create the
 
     #split into multiple files based on the keyids
-    final_pt_data_frames=split(wse_pt,wse_pt$keyid)
-    
-    #now we've got a dataframe for each key file. Check each for what we need
-    check_data_frames=function(wse_pt,pt_data,filename_base){
-    
-      filename=paste0(filename_base,'_',unique(wse_pt$keyid))
+    final_pt_data_frames=split(correction_file_pt,clean_pt$keyid)
 
-          if (all(is.na(wse_pt))){
+    #now we've got a dataframe for each key file. Check each for what we need and make the correction
+    #the idea is that we make a different csv file per each key file so we can track where they
+    #came from, and since the keyfile defines when the PT was in the water
+    check_data_frames=function(correction_file_pt,pt_data,filename_base){
+   
+      filename=paste0(filename_base,'_',unique(correction_file_pt$keyid))
+
+          if (all(is.na(clean_pt))){
             print(filename)
                     clean_pt='there are no gnss points to make a correction with. The thresholds that define -close enough- between GNSS and pt arent met'
                 write.csv(clean_pt,file=paste0(flagged_pt_output_directory,filename))
             return(NA)}
-          if (nrow(wse_pt)<5 ){
+          if (nrow(clean_pt)<5 ){
               flag=flag+10
-            # print(filename)
-            # print('not enough data to create offset, change your thresholds or double check the data')
-            # output='not enough data to create offset, change your thresholds or double check the data. There are data, but not a lot'
-            # offset_pt=mutate(offset_pt,error=output)
-            # write.csv(offset_pt,file=paste0(flagged_pt_output_directory,filename))
-            # return(NA)
           }
       
       # final_pt=mutate(wse_pt,flag=flag)
+    
 
           #first strip the offset df into just the gnss time and the pt correction and SD
-
-    svelte_offset_pt=dplyr::select(wse_pt,pt_correction,pt_wse_sd,pt_time_UTC)%>%
+    svelte_offset_pt=dplyr::select(correction_file_pt,pt_correction,pt_correction_sd,pt_time_UTC,pt_correction_wse_sd_m,pt_correction_gnss_sd_m)%>%
     mutate(pt_time_UTC=as.POSIXct(pt_time_UTC,format ="%Y-%m-%d %H:%M:%S"))%>%
     group_by(pt_time_UTC)%>%
-    summarise(pt_time_UTC=first(pt_time_UTC),pt_correction=first(pt_correction),pt_wse_sd=first(pt_wse_sd))
+    summarise(pt_time_UTC=first(pt_time_UTC),pt_correction=first(pt_correction),pt_correction_sd=first(pt_correction_sd),
+              pt_correction_wse_sd_m=first(pt_correction_wse_sd_m),pt_correction_gnss_sd_m=first(pt_correction_gnss_sd_m))
     
     find_closest_ping=function(pt_df,offset_df){
-       time_diff= as.POSIXct(pt_df['pt_time_UTC'])- offset_df$pt_time_UTC
+      #make a time difference vector between the 15 min pt data and the correction vector defined above
+       time_diff= as.POSIXct(pt_df['pt_time_UTC'])- offset_df$pt_time_UTC 
+       
+      #find the first difference, i.e., the closest time is the one we want
        time_index= first(which (abs(time_diff) == min(abs(time_diff),na.rm=TRUE)))
     
-    
+
+       
+       
+      #save that single row as a correction # 1/05 was -transmute(ping_time_UTC=pt_time_UTC
         correct_ping=offset_df[time_index,]%>%
-        transmute(ping_time_UTC=pt_time_UTC,pt_correction=pt_correction,pt_wse_sd=pt_wse_sd)
+        transmute(pt_time_UTC=pt_time_UTC,pt_correction=pt_correction,pt_correction_sd=pt_correction_sd,
+                  pt_correction_wse_sd_m=pt_correction_wse_sd_m,pt_correction_gnss_sd_m=pt_correction_gnss_sd_m)
         }
     
+    #loop through the PT dataframe that we read in at the very beginning- the full PT record filtered
+    #for when it is in the water 'pt_data', and apply this closest ping operation
     correct_pings=do.call(rbind,apply(pt_data,1,find_closest_ping,offset_df=svelte_offset_pt))
-
-    final_pt=cbind(pt_data,correct_pings)%>%
+#     print(unique(correct_pings$pt_time_UTC))
+# print(unique(correct_pings$pt_correction))
+    
+    #join those closest ping values to the original PT data. IMPLICIT MATCH! but, no reordering was done
+    #create the final wse and look across the corrections to quantify the variance in that correction
+    # print(nrow(correct_pings))
+    #     print(head(correct_pings))
+    #     print(max(correct_pings$pt_time_UTC))
+    # print(nrow(pt_data))
+        
+        # print(max(pt_data$pt_time_UTC)) # 1/05 These match length but are not applying offset before or after gnss install/uninstall...why?
+    # final_pt=cbind(pt_data,correct_pings)%>% 
+        ### This is NOT RIGHT - MUST FIXXXXXXX ####
+    final_pt=pt_data %>%
+        left_join(correct_pings,by='pt_time_UTC')%>%
             mutate(pt_wse=pt_level+pt_correction)%>%
-            mutate(sigma_pt_correction_m=sd(pt_correction))%>%
+            mutate(sigma_total_pt_correction_m=sd(pt_correction)) #this is the overall variance in corrections
+      #add the quality flags
+    
+   print(final_pt[4141,])
+        bonk
+    #check to see if the PT thinks it shifted 
+    pt_shift_vector_final= c(0,final_pt$pt_wse)-c(final_pt$pt_wse,0)
+    if(length(pt_shift_vector_final)>5){
+      pt_shift_vector_final=pt_shift_vector_final[3:(length(pt_shift_vector_final)-3)]}
+    
+    ### PT has shifted due to processing and offset changes ###
+    if(any(abs(pt_shift_vector_final)>change_thresh_15_min)){
+      # print(plot(pt_shift_vector))
+      flag=flag+100
+    }
+    
+    
+    
+    if(final_pt$sigma_total_pt_correction_m[1]>gnss_sd_thresh ){
+      flag=flag+1000
+    }
+      
+    #1, 10, 11,100,1000
+    #   1 - if there is a shift in the raw PT data-
+    #  10- if there are less than 5 GNSS points to make a correciton
+    # 100- if after processing there is a shift in the PT data
+    #1000- if if the overall corrections are noisy
+    
+    #xample
+    # 1010 - both 1000 and 10 are on
+    # 101 - shift in raw PT and shift in processed PT
+    final_pt=final_pt%>%
     mutate(flag=flag)
-    #this is a weighted variance of allt he corrections that were applied. There may be only 1-5 corrections ('ping times'), 
-    #but if e.g. a value is only applied to one PT time then it isn't really affecting the PT record that much. Instead of flagging this, 
-    #we pass this to the PT file.       
+         
+### New analysis for offset correction ###
 
+        #Step 1 - If(first-last) < tolerance (what is this tolerance?), then average first + last and apply to all timeseries (no fly-by's)
+        
+        
+        
           print(filename)
           print('this file passed all checks')
           write.csv(final_pt,file=paste0(QA_QC_pt_output_directory,filename),row.names=FALSE)
 
 
     } #end loop function for dataframes
-    
-        
     
     dummy=lapply(final_pt_data_frames,check_data_frames,pt_data=pt_data,filename_base=filename_base)
     

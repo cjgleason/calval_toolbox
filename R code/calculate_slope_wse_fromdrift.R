@@ -1,7 +1,9 @@
 calculate_slope_wse_fromdrift=function(SWORD_path,drift_directory,PT_directory,output_directory,this_river_reach_ids,this_river_node_ids,
                                        utm_zone, buffer,rivername, photo_path=NULL, reprocess_switch, core_count, scale_maxwidth){
-  
+
     suppressWarnings({
+#       
+     
 
 #this code creates sword products from drifts
 
@@ -248,8 +250,9 @@ make_polys= function(node_df){
   spatial_drift=st_as_sf(drift_in,coords=c('UTM_x','UTM_y'),crs=paste0('+proj=utm +zone=',zone,' +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs') ) 
   points_in_node=st_intersection(spatial_drift,final_node_df)%>%
     group_by(node_id)%>%
-    summarize(node_wse=mean(gnss_wse,na.rm=T),
-              node_wse_precision_m=0.05,# JPL wants precision, not variance. sd(gnss_wse,na.rm=T),
+    summarize(node_wse_m=mean(gnss_wse,na.rm=T),
+                                          # wse sd through the node    +  average gnss uncertainty.
+              node_wse_total_error_m= sqrt(sd(gnss_wse,na.rm=T)^2 + mean(gnss_uncertainty_m) ^2),
               time=mean(gnss_time_UTC),
               node_height_above_ellipsoid=mean(height_above_ellipsoid,na.rm=TRUE),
               reach_id=reach_id[1],
@@ -296,41 +299,29 @@ calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river
     spatial_drift=st_as_sf(drift_in,coords=c('UTM_x','UTM_y'),crs=paste0('+proj=utm +zone=',zone,' +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs') ) 
     points_in_reach=st_intersection(spatial_drift,reach_id_filtered)
     
-    # old aspatial code
-    # 
-    # relevant_drift_index= which(  drift_in$gnss_Lat>reach_id_filtered$reach_ymin &
-    #                               drift_in$gnss_Lat<reach_id_filtered$reach_ymax &
-    #                               drift_in$gnss_Lon>reach_id_filtered$reach_xmin &
-    #                               drift_in$gnss_Lon<reach_id_filtered$reach_xmax)
-    # 
-    # filtered_drift=drift_in[relevant_drift_index,]
-    
     if (nrow(  points_in_reach)==0){
       
    
       output=data.frame(reach_id=reach_id_search,
-                        wse_bar=NA,
-                        wse_precision=NA,
-                        ellipsoid_height=NA,
-                        wse_start= '2000-01-01 12:00:00',
-                        wse_end= '2000-01-01 12:00:00',
-                        slope= NA,
-                        slope_precision=NA,
+                        reach_wse_bar_m=NA,
+                        reach_wse_total_error_m=NA,
+                        reach_height_above_ellipsoid_m=NA,
+                        wse_time_start= '2000-01-01 12:00:00',
+                        wse_time_end= '2000-01-01 12:00:00',
+                        slope_m_m= NA,
+                        slope_total_error_m_m=NA,
                         drift_id=drift_file)
       
       return(output)
     }
 
-    ##old aspatial code
-    # reach_wse_bar_m=mean(drift_in$gnss_wse[relevant_drift_index],na.rm=T)
-    # reach_wse_precision_m =0.05 # JPL wants precision, not variance. sd(drift_in$gnss_wse[relevant_drift_index],na.rm=T)
-    # wse_time_start= min(drift_in$gnss_time_UTC[relevant_drift_index])
-    # wse_time_end=max(drift_in$gnss_time_UTC[relevant_drift_index])
-    
+
 
     reach_wse_bar_m=mean( points_in_reach$gnss_wse,na.rm=T)
     reach_height_above_ellipsoid_m=mean(points_in_reach$height_above_ellipsoid,na.rm=TRUE)
-    reach_wse_precision_m =0.05 # JPL wants precision, not variance. sd(drift_in$gnss_wse[relevant_drift_index],na.rm=T)
+    #uncertainty here is NOT the total error of wse + gnss, that woudl give something that reflected the steepness of hte reach
+    #we just want to to know how precisely we can resolve the mean
+    reach_wse_total_error_m = mean(points_in_reach$gnss_uncertainty_m) 
     wse_time_start= min(points_in_reach$gnss_time_UTC,na.rm=T)
     wse_time_end=max(points_in_reach$gnss_time_UTC,na.rm=T)
     
@@ -381,28 +372,29 @@ calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river
 
   slope_start_elevations= drift_in[slope_start_index,]$gnss_wse
   slope_end_elevations= drift_in[slope_end_index,]$gnss_wse
+  slope_start_total_error= mean(drift_in[slope_start_index,]$gnss_uncertainty_m)
+  slope_end_total_error= mean(drift_in[slope_end_index,]$gnss_uncertainty_m)
   
       #this convention results in a negative slope, so swithing the start and end here to make a positive number
-  slope= (mean(slope_end_elevations)- mean(slope_start_elevations)) / cl_distance
-  slope_sd= (sqrt(sd(slope_start_elevations)^2+sd(slope_end_elevations)^2)) / cl_distance
+  slope_m_m= (mean(slope_end_elevations)- mean(slope_start_elevations)) / cl_distance
+  slope_total_error_m_m= (sqrt(sd(slope_start_elevations)^2+sd(slope_end_elevations)^2 +   slope_start_total_error ^2   +   slope_end_total_error ^2 )) / cl_distance
 
       
       
-  if (is.na(slope_sd)){reach_wse_bar_m=NA}#kluge that tells us the whole reach wasn't floated
+  if (is.na(slope_total_error_m_m)){reach_wse_bar_m=NA}#kluge that tells us the whole reach wasn't floated
   
     
 
  
     output1=data.frame(reach_id=reach_id_search,
-                      wse_bar=reach_wse_bar_m,
-                      ellipsoid_height=reach_height_above_ellipsoid_m,
-                      wse_precision=reach_wse_precision_m,
-                      wse_start= as.character(wse_time_start),
-                      wse_end= as.character(wse_time_end),
-                      slope= slope,
-                      slope_precision=slope_sd,
+                      reach_wse_bar_m=reach_wse_bar_m,
+                      reach_height_above_ellipsoid_m=reach_height_above_ellipsoid_m,
+                      reach_wse_total_error_m=reach_wse_total_error_m,
+                      wse_time_start= as.character(wse_time_start),
+                      wse_time_end= as.character(wse_time_end),
+                      slope_m_m= slope_m_m,
+                      slope_total_error_m_m=slope_total_error_m_m,
                       drift_id=drift_file)
-
 
     
     return(output1)
@@ -414,7 +406,7 @@ calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river
  
   #print(output2)
  output3=do.call(rbind,output2)%>%
-     filter(!is.na(wse_bar))
+     filter(!is.na(reach_wse_bar_m))
 
 
   
@@ -460,6 +452,8 @@ node_wses=do.call(rbind,lapply(drifts,calc_node_wse,node_df=node_df,cl_df=cl_df,
   as.data.frame()%>%
   dplyr::select(-geometry.x,-geometry.y,-poly_list)
 
+
+        
  # driftno=core_count
 
 #      print(driftno)  
@@ -475,7 +469,11 @@ node_geom=as.data.frame(node_wses)%>%
 
     
     
-node_wses=as.data.frame(node_wses)%>% transmute(time_UTC=time,node_id=node_id,drift_id=drift_id,mean_node_drift_wse_m=node_wse,mean_node_drift_wse_precision_m=node_wse_precision_m,ellipsoid_height_m=node_height_above_ellipsoid)
+node_wses=as.data.frame(node_wses)%>% transmute(time_UTC=time,node_id=node_id,drift_id=drift_id,
+                                                mean_node_drift_wse_m=node_wse_m,
+                                                node_total_error_m=node_wse_total_error_m,
+                                                ellipsoid_height_m=node_height_above_ellipsoid)
+   
 
 reach_geom=as.data.frame(spatial_reach)%>%
   dplyr::select(reach_id,geometry)
@@ -483,15 +481,21 @@ reach_geom=as.data.frame(spatial_reach)%>%
     
     
 
-reach_stats=do.call(rbind,lapply(drifts,calc_reach_stats,spatial_reach=spatial_reach,              buffer=buffer,cl_df=cl_df,zone=utm_zone,this_river_reach_ids=this_river_reach_ids))%>%
+reach_stats=do.call(rbind,lapply(drifts,calc_reach_stats,spatial_reach=spatial_reach,            
+                                 buffer=buffer,cl_df=cl_df,zone=utm_zone,this_river_reach_ids=this_river_reach_ids))%>%
   mutate(reach_id=format(reach_id,scientific = FALSE))%>%
-  filter(!is.na(slope_precision))%>% transmute(reach_id=reach_id,mean_reach_drift_wse_m=wse_bar,mean_reach_drift_wse_precision_m=wse_precision,wse_drift_start_UTC=wse_start,wse_drift_end_UTC=wse_end, reach_drift_slope_m_m=slope,reach_drift_slope_precision_m=slope_precision,drift_id=drift_id,ellipsoid_height_m=ellipsoid_height)
+  filter(!is.na(slope_total_error_m_m))%>% transmute(reach_id=reach_id,
+                                               mean_reach_drift_wse_m=reach_wse_bar_m,
+                                               mean_reach_drift_wse_total_error_m= reach_wse_total_error_m,
+                                               wse_drift_start_UTC=wse_time_start,
+                                               wse_drift_end_UTC=wse_time_end, 
+                                               reach_drift_slope_m_m=slope_m_m,
+                                               reach_drift_slope_precision_m=slope_total_error_m_m,
+                                               drift_id=drift_id,
+                                               reach_height_above_ellipsoid_m=reach_height_above_ellipsoid_m)
     
-    
-# reach_stats=calc_reach_stats(drifts[driftno],spatial_reach=spatial_reach,              buffer=buffer,cl_df=cl_df,zone=utm_zone,this_river_reach_ids=this_river_reach_ids)%>%
-#   mutate(reach_id=format(reach_id,scientific = FALSE))%>%
-#   filter(!is.na(slope_precision))%>% transmute(reach_id=reach_id,mean_reach_drift_wse_m=wse_bar,mean_reach_drift_wse_precision_m=wse_precision,wse_drift_start_UTC=wse_start,wse_drift_end_UTC=wse_end, reach_drift_slope_m_m=slope,reach_drift_slope_precision_m=slope_precision,drift_id=drift_id,ellipsoid_height_m=ellipsoid_height)
-     # stopCluster(CLUSTER)
+
+
          
         print(paste0(output_directory,'/reach/',rivername,'_drift_reach_wse_slope.csv'))
 
@@ -506,7 +510,7 @@ write.table(reach_geom,paste0(output_directory,'/reach/',rivername,'_drift_reach
 write.table(node_wses,paste0(output_directory,'/node/',rivername,'_drift_node_wses.csv'),append=TRUE,row.names=FALSE, sep=',')
 write.table(reach_stats,paste0(output_directory,'/reach/',rivername,'_drift_reach_wse_slope.csv'),append=TRUE,row.names=FALSE, sep=',')}
         
-        })
+         })
 
- }
+  }
 
