@@ -1,19 +1,19 @@
 # SWOT Calibration and Validation Hydrology Toolboxes
 
-## Toolboxes for the hydrology corrections of cal/val field data for comparison with SWOT satellite data.
+## Toolboxes for hydrology corrections of cal/val field data for comparison with SWOT satellite data.
 
 To run the toolboxes, the following inputs from the PO.DAAC repository are required:
 
 **PT inputs:**
-- PT data directory containing all raw PT csv files. First 11 rows of the csv are metadata, header on line 12 contains the following data:
+- PT data directory containing all PT L1 csv files that have been barologger corrected. First 11 rows of the csv are metadata, header on line 12 contains the following data:
 
 | Variable	| Description |
 |----------|--------------|
-|Date	| yyyy/mm/dd format |
-| Time |	UTC |
+| Date	| m/dd/yyyy format |
+| Time |	UTC 12 hour format |
+| ms | 0 |
 | Level	| meters |
 | Temperature	| °C |
-|Offset	 | meters |
 
 - PT key csv file that links PTs to SWORD reaches/nodes, install/uninstall GNSS drifts, and contains spatial information about the PT:
 
@@ -21,54 +21,55 @@ To run the toolboxes, the following inputs from the PO.DAAC repository are requi
 |----------|--------------|
 | PT_Serial	| 7-digit PT serial number |
 | Label	| Field label (e.g. PT1, BL1) |
-|Node_ID	| SWORD node ID |
-| Reach_ID	| SWORD reach ID |
-| US_Reach_ID	| Upstream SWORD reach ID |
-| DS_Reach_ID	| Downstream SWORD reach ID |
-| Lat_WGS84	| |
-| Long_WGS84 | |
-| Easting_UTM	| |
-| Northing_UTM | |
-| Install_method	| E.g. rebar, cinderblock |
-| Date_install	| m/dd/yyyy format |
-| Time_Install_UTC | UTC 24 hour format |
-| Date_Uninstall | |	
-| Time_Uninstall | |
-| GNSS_install_date | |
-| GNSS_install_start | |
-| GNSS_install_end | |
-| GNSS_offset_m	| meters |
-| Receiver | GNSS receiver used (e.g. Rec3) |
-| Original_log_file |
-| Final_log_file |
-| GNSS_uninstall_start |
-| GNSS_uninstall_end |	
-| Receiver |
-| Original_log_file |
-| Final_log_file |	
+| Baro_Comp | Barologger used to compensate PT level (e.g. BL1) |
+| Node_ID	| SWORD node ID nearest PT |
+| Reach_ID	| SWORD reach ID nearest PT |
+| US_Reach_ID	| Upstream SWORD reach ID, relative to slope calculation |
+| DS_Reach_ID	| Downstream SWORD reach ID, relative to slope calculation |
+| Lat_WGS84	| Latitude |
+| Long_WGS84 | Longitude |
+| Install_method	| e.g. rebar, cinderblock |
+| Date_PT_Install	| m/dd/yyyy format |
+| Time_PT_Install_UTC | UTC 24 hour hh:mm format |
+| Date_PT_Uninstall | m/dd/yyyy format |	
+| Time_PT_Uninstall_UTC | UTC 24 hour hh:mm format |
+| Date_GNSS_Install | m/dd/yyyy format |
+| Time_GNSS_Install_Start_UTC | UTC 24 hour hh:mm:ss format |
+| Time_GNSS_Install_End_UTC | UTC 24 hour hh:mm:ss format |
+| GNSS_Offset_m	| Distance from receiver to water surface, meters |
+| Receiver_Install | GNSS receiver used (e.g. Rec3) |
+| Original_Install_Log_File | Septentrio filename (e.g. Rec3_20230310_001)|
+| Final_Install_Log_File | SWOTCalVal_campaignshortname_datatype_instrumentname_startdatetime_enddatetime |
+| Date_GNSS_Uninstall | m/dd/yyyy format |
+| Time_GNSS_Uninstall_Start_UTC | UTC 24 hour hh:mm:ss format |
+| Time_GNSS_Uninstall_End_UTC | UTC 24 hour hh:mm:ss format |
+| Receiver_Uninstall | GNSS receiver used (e.g. Rec3) |
+| Original_Uninstall_Log_File | Septentrio filename (e.g. Rec3_20230620_001)|
+| Final_Uninstall_Log_File | SWOTCalVal_campaignshortname_datatype_instrumentname_startdatetime_enddatetime |
 
 **GNSS inputs:**
 -	GNSS drift data directory with all raw GNSS netCDF files containing:
 
 | Variable	| Description |
 |----------|--------------|
-| Latitude |
-| Longitude	|
-| WSE	| Water surface elevation (meters) wrt geoid |
+| latitude | Latitude of the GNSS antenna reference point with respect to the reference ellipsoid |
+| longitude	| Longitude of the GNSS antenna reference point with respect to the reference ellipsoid |
+| wse	| Water surface elevation relative to the provided model of the geoid (geoid) with corrections for tidal effects (solid_earth_tide, load_tide_fes, and pole_tide) applied by subtracting from height_water. |
 | Time_tai	| Seconds since January 1 2000 at midnight without leap seconds |
-| Motioncode_flag	| 0, 1, or 2. Only 2 indicates quality data |
-| Surfacetype_flag	| 10, 11, or 12. Only 12 indicates quality data |
+| motioncode_flag	| Indicates motion of the platform: 0, 1, or 2. 2 indicates moving data |
+| surfacetype_flag	| Indicates surface type of measurement, 10, 11, or 12. 12 indicates data over water |
 | ellipsoid_semi_major_axis	|
 | ellipsoid_flattening |
-| postion_3drss_formal_error |	
-| infoEventDescription |
-| infoEventStartTime |	
-| infoEventEndTime |	
+| postion_3drss_formal_error | Three-dimensional root-sum-square formal error of position estimate |
+| infoEventDescription | Description of noteworthy events (e.g. bridge or power line) that occurred during the campaign |
+| infoEventStartTime |	Start time of noteworthy events in seconds in the UTC time scale since 1 Jan 2000 00:00:00 UTC |
+| infoEventEndTime |	End time of noteworthy events in seconds in the UTC time scale since 1 Jan 2000 00:00:00 UTC |
 
 **SWORD inputs:**
-- SWORD data in the netCDF format brought in at the continental scale with centerline, node, and reach data. See [SWORD Production Description PDF](http://gaia.geosci.unc.edu/SWORD/SWORD_ProductDescription_v14.pdf) for detailed dataset documentation.
+- SWORD data in the netCDF format brought in at the continental scale with centerline, node, and reach data. See the [SWORD Explorer](https://www.swordexplorer.com) for links to detailed dataset documentation.
+- Domain csv file containing all SWORD reaches and nodes of interest.
 
-Empty directories are created to store munged data outputs for PTs, GNSS drifts, and integrated SWORD products in addition to directories created for quality control flagged PT and GNSS drift output data.
+Empty directories named by processing date are created to store munged data outputs for PTs, GNSS drifts, and integrated SWORD products in addition to directories created for quality control flagged PT and GNSS drift output data. Depending on the reprocess_switch, dataframes may just be appended with additional data (0) or all reach and node products are recreated (1).
 
 ## Creating data frames from GNSS drifts
 
