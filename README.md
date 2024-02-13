@@ -2,7 +2,7 @@
 
 ## Toolboxes for hydrology corrections of cal/val field data for comparison with SWOT satellite data.
 
-To run the toolboxes, the following inputs from the PO.DAAC repository are required:
+To run the river toolboxes, the following inputs from the PO.DAAC repository are required:
 
 **PT inputs:**
 - PT data directory containing all PT L1 csv files that have been barologger corrected. First 11 rows of the csv are metadata, header on line 12 contains the following data:
@@ -45,7 +45,7 @@ To run the toolboxes, the following inputs from the PO.DAAC repository are requi
 | Time_GNSS_Uninstall_End_UTC | UTC 24 hour hh:mm:ss format |
 | Receiver_Uninstall | GNSS receiver used (e.g. Rec3) |
 | Original_Uninstall_Log_File | Septentrio filename (e.g. Rec3_20230620_001)|
-| Final_Uninstall_Log_File | SWOTCalVal_campaignshortname_datatype_instrumentname_startdatetime_enddatetime |
+| Final_Uninstall_Log_File | SWOTCalVal_campaignshortname_GNSS_L1_instrumentname_startdatetime_enddatetime |
 
 **GNSS inputs:**
 -	GNSS drift data directory with all raw GNSS netCDF files containing:
@@ -54,13 +54,14 @@ To run the toolboxes, the following inputs from the PO.DAAC repository are requi
 |----------|--------------|
 | latitude | Latitude of the GNSS antenna reference point with respect to the reference ellipsoid |
 | longitude	| Longitude of the GNSS antenna reference point with respect to the reference ellipsoid |
-| wse	| Water surface elevation relative to the provided model of the geoid (geoid) with corrections for tidal effects (solid_earth_tide, load_tide_fes, and pole_tide) applied by subtracting from height_water. |
-| Time_tai	| Seconds since January 1 2000 at midnight without leap seconds |
+| wse	| Water surface elevation relative to the provided model of the geoid with corrections for tidal effects (solid_earth_tide, load_tide_fes, and pole_tide) applied by subtracting from height_water. |
+| time_tai	| Seconds since January 1 2000 at midnight without leap seconds |
 | motioncode_flag	| Indicates motion of the platform: 0, 1, or 2. 2 indicates moving data |
 | surfacetype_flag	| Indicates surface type of measurement, 10, 11, or 12. 12 indicates data over water |
-| ellipsoid_semi_major_axis	|
+| ellipsoid_semi_major_axis	| 
 | ellipsoid_flattening |
 | postion_3drss_formal_error | Three-dimensional root-sum-square formal error of position estimate |
+| height_water | Height of the water level with respect to the reference ellipsoid |
 | infoEventDescription | Description of noteworthy events (e.g. bridge or power line) that occurred during the campaign |
 | infoEventStartTime |	Start time of noteworthy events in seconds in the UTC time scale since 1 Jan 2000 00:00:00 UTC |
 | infoEventEndTime |	End time of noteworthy events in seconds in the UTC time scale since 1 Jan 2000 00:00:00 UTC |
@@ -69,34 +70,50 @@ To run the toolboxes, the following inputs from the PO.DAAC repository are requi
 - SWORD data in the netCDF format brought in at the continental scale with centerline, node, and reach data. See the [SWORD Explorer](https://www.swordexplorer.com) for links to detailed dataset documentation.
 - Domain csv file containing all SWORD reaches and nodes of interest.
 
-Empty directories named by processing date are created to store munged data outputs for PTs, GNSS drifts, and integrated SWORD products in addition to directories created for quality control flagged PT and GNSS drift output data. Depending on the reprocess_switch, dataframes may just be appended with additional data (0) or all reach and node products are recreated (1).
+**Initializing the toolboxes**
+
+The river toolboxes are run on one field campaign at a time. First, the river of interest needs to be defined, along with the hubname associated with it (e.g. UC, UMass, UNC), the corresponding PT_key_file(s), utm_zone, and continent. A reach_end_buffer (which 'extends' reaches) and scale_maxwidth (how many SWORD widths wide each node box is) are also defined.
+
+Empty directories named by processing date are created to store munged data outputs for PTs, GNSS drifts, and integrated SWORD products in addition to directories created for quality control flagged PT and GNSS drift output data. Depending on the reprocess_switch, dataframes may just be appended with additional data (0) or all reach and node products are recreated if there are major updates to toolbox processing (1). The directories are:
+- Munged drifts/reprocessed_yyyy_mm_dd
+- Munged PT/reprocessed_yyyy_mm_dd
+- Data frames/reprocessed_yyyy_mm_dd
+- Flagged PT/reprocessed_yyyy_mm_dd
+- Flyby PT/reprocessed_yyyy_mm_dd
 
 ## Creating data frames from GNSS drifts
 
-- First, check for un-munged GNSS files in the GNSS drift data directory that have not already been processed. If there are, then run the create_GNSS_dataframe function.
+- First, list all the GNSS files returned from JPL processing that match the river of interest. There might be 'bad' duplicates of GNSS files, so filter by version date to pull in the most recent files.
 
-- The function reads in the netCDF GNSS drifts sourced from PO.DAAC and creates a data frame in an xml format for cleaning and quality flagging.
+- Run the create_GNSS_dataframe function. The function reads in the netCDF GNSS drifts sourced from PO.DAAC and creates a data frame in an xml format for cleaning and quality flagging with the fields listed in the GNSS inputs pulled in.
 
-- Event code times are converted to POSIXct UTC. A one-minute buffer is added to the start and end time of the event codes, before powerline and bridge events are filtered out.
+- Event code times are converted to POSIXct UTC. A one-minute buffer is added to the start and end time of the event codes that are powerlines or bridges.
 
-- All of the GNSS times in the TAI format are converted to POSIXct UTC. Only data with the surface flag of 12 and motion code of 2 are kept. Data with an uncertainty greater than 5cm are filtered out.
+- All of the GNSS TAI times format are converted to POSIXct UTC. Only data with the surface flag of 12 (water) and motion code of 2 (moving) are kept. Data with an uncertainty (position_3drss_formal_error) greater than 5cm are filtered out.
 
-- If the resulting data frame has no lines, the toolbox will print that the filename bonked.
+- ***Special case*** The Waimakariri River has static GNSS PT install files that need to be retained with a motion code of 0 (static). For just the Waimak, check if the GNSS file is listed in the keyfile. If it is, generate a dataframe as above, but without filtering motion or surface codes.
 
-- Finally, the munged data frame is written to a csv in the GNSS output directory with the following fields:
+- Two information event dataframes are created: bad_info_df consisting of powerlines and bridge events, and good_info_df consisting of TP (turning points). Get ride of the bad data, and if the resulting data frame has no lines, the toolbox will print that the filename bonked.
+
+- If there are no lines in the good_info_df, then we are done and the munged GNSS data frame is written to a csv in the GNSS output directory.
+
+- If there are turning points, the GNSS file must be split at the beginning of the new good data. Split GNSS files following calval naming conventions, with an additional number indicating number of file splits at the end.
+
+- Finally, the munged data frames are written to a csv in the GNSS output directory with the following fields:
 
 | Variable	| Description |
 |----------|--------------|
-| GNSS_Lat	| WGS84 |
-| GNSS_Lon	| WGS84 |
-| GNSS_wse	| In meters |
-| GNSS_time_tai	| Seconds since January 1 2000 at midnight without leap seconds |
-| GNSS_uncertainty	| In meters, only values < 0.05 m |
-| GNSS_surf_flag	| Should be 12, indicating quality data over water |
-| GNSS_motion_flag	| Should be 2, indicating moving data collection |
-| GNSS_time_UTC	| yyyy-mm-dd hh:mm:ss format |
-| GNSS_ellipsoid	| Corrected by JPL |
-| Drift_ID	| Following calval naming conventions |
+| gnss_Lat	| WGS84 |
+| gnss_Lon	| WGS84 |
+| gnss_wse	| Water surface elevation relative to the provided model of the geoid in meters |
+| gnss_time_tai	| Seconds since January 1 2000 at midnight without leap seconds |
+| gnss_uncertainty_m	| In meters, only values < 0.05 m |
+| gnss_surf_flag	| Should be 12, indicating quality data over water |
+| gnss_motion_flag	| Should be 2, indicating moving data collection |
+| height_above_ellipsoid | Height of the water level with respect to the reference ellipsoid in meters |
+| gnss_time_UTC	| yyyy-mm-dd hh:mm:ss 24 hour format |
+| gnss_ellipsoid | ellipsoid_semi_major_axis, ellipsoid_flattening |
+| drift_id	| Munged drifts/reprocessed_yyyy_mm_dd/SWOTCalVal_campaignshortname_GNSS_L2_instrumentname_startdatetime_enddatetime |
 
 ## Correct PTs to GNSS
 
