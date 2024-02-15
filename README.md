@@ -117,41 +117,63 @@ Empty directories named by processing date are created to store munged data outp
 
 ## Correct PTs to GNSS
 
+**Only correct PTs to GNSS occupies**
+
 Error thresholds for data:
 
 **Distance threshold:** 150 meters, PT must be within a 150 m radius of a GNSS drift
 
 **Time threshold:** 900 seconds (15 minutes), centered around PT collect, so 15 minutes before and after
 
-**GNSS standard deviation:** 0.15 meters, how much variance is allowed in GNSS data when it is within the distance threshold
+**GNSS standard deviation:** 0.05 meters, how much variance is allowed in GNSS data when it is within the distance threshold
 
-**Offset standard deviation:** 0.10 meters, how much variance is allowed in PT data from put in to take out
+**Offset standard deviation:** 0.10 meters, how much variance is allowed in PT data from put in to take out. This is currently turned off
 
-**Change threshold over 15 minutes:** 0.05 meters, does it change more than 5cm in 15 minutes? If so, that is a discontinuity in offset
+**Change threshold over 15 minutes:** 0.15 meters, does it change more than 15cm in 15 minutes? If so, that is a discontinuity in offset
 
-***These will be specific to each river and are subject to change/should be up for debate!***
+**Dry threshold:** 0.10 meters, this is a raw PT level where anything below is considered a PT out of water
 
-- First, check for un-munged PT data in the PT data directory that have not already been processed. If there are, then run the correct_pt_to_gnss function.
+***These should eventually be specific to each river and are subject to change/should be up for debate!***
 
-- The function reads in the raw PT files and the PT key file and IDs PTs based on their serial numbers. There are 11 lines of headers to skip when creating PT data frames in csv format. For the mock Willamette data there is a missing header so have to skip the 12th line and create a header.
+- First, check for un-munged csv PT L1 data in the PT data directory that have not already been processed. If there are, then run the correct_pt_to_gnss_only function.
 
-- The last step in data tidying is to merge PT files with the PT key file with a left join based on PT serial number. The PT date and time are also mutated to the standard POSIXct UTC time.
+- Read in the key file, fill blank cells with NA, and check that number of columns and names are correct.
 
-- Next up, come the actual corrections to the PT data to get corrected water surface elevation. First, check to make sure the key file is properly joined to the PT data and there is data in the cleaned PT files, if not return NA.
+- The correct_pt_to_gnss_only function reads in the raw PT files and the PT key files and IDs PTs based on their serial numbers. Check to make sure that the PTs in the key file exist and the csv files contain data. There are 11 lines of headers to skip when creating PT data frames in csv format. The PT data should log at 15min intervals and must be mutated to the standard POSIXct UTC time.
 
-- Read in the munged GNSS drift data and mutate the datetime into R’s POSIXct format, as this is lost when the file was written to a csv.
+-The correct PT key file to join to the PT data is selected by the install and uninstall (in the water) time, which is always in the PT record. If the PT record is much shorter than expected, this is likely due to a mismatch between baro-corrected PT times and keyfile times.
 
-- Do an inner join of the PT and GNSS data by datetime, applying the site-specific time threshold. For example, with a threshold of 15 minutes, all GNSS data at 1 Hz within 30 minutes of every PT observation will be pulled.
+- The last step in data tidying is to merge PT files with the PT key file with a left join based on PT serial number, filtered to times when the PT was in the water (install and uninstall dates, and above the dry PT threshold).
 
-- Use a haversine to determine the distance between all PT data and moving GNSS data. Filter the GNSS drifts to only keep data that are under the distance threshold. For example, with a threshold of 150 m, only GNSS data within a 150 m radius of a PT will be pulled.
+- Next up, come the actual corrections to the PT data to get water surface elevation. First, check to make sure the key file is properly joined to the PT data and there is data in the cleaned PT files, if not return NA. Also check to see if there are any shifts in the PT data (defined by the change_thresh_15_min), if there are flag the data with 1.
 
-- Ensure there is at least one GNSS drift to make a valid offset correction by checking that a linked drift exists and contains more than zero rows. Otherwise, return NA.
+- Filter the PT data to the time of the GNSS install and uninstall, if both are available or just get the GNSS install data time. If there are no GNSS data files linked in the keyfile, bonk.
 
-- Multiple GNSS points go to one PT observation, so group the PT by timestep and create the correction of GNSS water surface elevation minus the PT level (both in meters). Every time a drift goes by, take the mean PT offset at that location. Differences in these offsets is the uncertainty of this mapping, so take the standard deviation of the PT offset as the uncertainty metric.
+- Read in the munged L2 GNSS drift data and mutate the datetime into R’s POSIXct format. If an L2 GNSS file doesn't exist, check on push/pull GNSS from JPL.
 
-- To create the PT corrections, the mean PT offset and the standard deviation of the PT offset are joined to the PT data frame with a left join. Corrected PT water surface elevation is added as the PT level plus the PT correction. Corrected PT water surface elevation standard deviation is added as the standard deviation of the PT offset plus 0.001 m (this is added for PT measurement error).
+- Do an inner join of the PT and GNSS data by datetime, applying the site-specific time threshold, data are limited to within the install and uninstall time frames. For example, with a threshold of 15 minutes, all GNSS data at 1 Hz within 30 minutes of every PT observation will be pulled.
 
-- There is a lot of exception handling that has to take place for a valid offset correction to take place. Errors are thrown in all the following cases and the PT file will be moved into the flagged PT output directory:
+- Multiple GNSS points go to one PT observation, so group the PT by occupy_id and create the offset correction of GNSS water surface elevation minus the PT level (both in meters).
+
+- To create the PT corrections, PT level and the PT offset correction are added together and then joined to the PT data frame with a left join.
+
+- Error is summarized in multiple ways. The PT correction total error is the standard deviation of the wse (boat bobbing) and the GNSS average error, propagated. The PT correction offset standard deviation and total error due to GNSS error are also summarized. The time difference between PT and GNSS measurements are also stored.
+
+- At this point, there should be either 1 or 2 final offset corrections (depending on if there was both an install and uninstall). Check to make sure there are not more than 2 or 0 rows in the final_offset_df, if either statement is true return an error message.
+
+NEW
+- PT flag descriptions:
+  - 0: all good
+  - 1: shift in raw PT (15cm in 15min)
+  - 10: no uninstall data
+  - 1000: (install - uninstall) > threshold
+  - 10000: Flybys don't agree with the offset. All install, uninstall, flybys averaged.
+  - 100000: there are not enough flybys: not appropriate to do anything
+  - 1000000: PT is likely settling. Linear fit was applied.
+  - 10000000: Flybys agree with OG file. Nothing changed.
+
+OLD
+- There is a lot of exception handling that has to take place for a valid offset correction to take place. Errors are thrown in all the following cases and the PT file will be moved into the flagged PT output directory with the following flags:
   -	The PT isn’t listed in the key file
   -	There are no GNSS data within the space-time thresholds
   -	There are not enough data to create offset (change your thresholds or double check the data), the current threshold is under 5 rows of data
