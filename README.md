@@ -39,13 +39,13 @@ To run the river toolboxes, the following inputs from the PO.DAAC repository are
 | GNSS_Offset_m	| Distance from receiver to water surface, meters |
 | Receiver_Install | GNSS receiver used (e.g. Rec3) |
 | Original_Install_Log_File | Septentrio filename (e.g. Rec3_20230310_001)|
-| Final_Install_Log_File | SWOTCalVal_campaignshortname_datatype_instrumentname_startdatetime_enddatetime |
+| Final_Install_Log_File | SWOTCalVal_campaignshortname_GNSS_L0_instrumentname_startdatetime_enddatetime |
 | Date_GNSS_Uninstall | m/dd/yyyy format |
 | Time_GNSS_Uninstall_Start_UTC | UTC 24 hour hh:mm:ss format |
 | Time_GNSS_Uninstall_End_UTC | UTC 24 hour hh:mm:ss format |
 | Receiver_Uninstall | GNSS receiver used (e.g. Rec3) |
 | Original_Uninstall_Log_File | Septentrio filename (e.g. Rec3_20230620_001)|
-| Final_Uninstall_Log_File | SWOTCalVal_campaignshortname_GNSS_L1_instrumentname_startdatetime_enddatetime |
+| Final_Uninstall_Log_File | SWOTCalVal_campaignshortname_GNSS_L0_instrumentname_startdatetime_enddatetime |
 
 **GNSS inputs:**
 -	GNSS drift data directory with all raw GNSS netCDF files containing:
@@ -161,46 +161,58 @@ Error thresholds for data:
 
 - At this point, there should be either 1 or 2 final offset corrections (depending on if there was both an install and uninstall). Check to make sure there are not more than 2 or 0 rows in the final_offset_df, if either statement is true return an error message.
 
-NEW
 - PT flag descriptions:
   - 0: all good
   - 1: shift in raw PT (15cm in 15min)
   - 10: no uninstall data
   - 1000: (install - uninstall) > threshold
-  - 10000: Flybys don't agree with the offset. All install, uninstall, flybys averaged.
-  - 100000: there are not enough flybys: not appropriate to do anything
-  - 1000000: PT is likely settling. Linear fit was applied.
-  - 10000000: Flybys agree with OG file. Nothing changed.
 
-OLD
-- There is a lot of exception handling that has to take place for a valid offset correction to take place. Errors are thrown in all the following cases and the PT file will be moved into the flagged PT output directory with the following flags:
-  -	The PT isn’t listed in the key file
-  -	There are no GNSS data within the space-time thresholds
-  -	There are not enough data to create offset (change your thresholds or double check the data), the current threshold is under 5 rows of data
-  -	GNSS range is too large (check thresholds or data), as defined by the GNSS standard deviation threshold
-  -	Correction too noisy (check thresholds or data), as defined by the offset standard deviation threshold derived from the GNSS and PT data
-  -	Offsets are too different over time (check thresholds or data), as defined by the change over 15 minutes threshold
-
-- Finally, join the corrected PT and standard deviation measurements with the munged PT data using the nearest time between the GNSS time and PT time in UTC. Remove PT data that is before/after the install/uninstall time. This process is slow and should be parallelized!
+- Finally, take the mean of the final_offset_df to get a singular PT offset and use a left join to add the offset and associated error estimates to the PT data. Apply the final PT offset to the pt_level to get PT wse filtered to when the PT was in the water.
 
 - The last step is to print out the filename and ‘this file has passed all checks’ and write a csv of the final PT data saved to the QA QC PT output directory with the following fields:
 
 | Variable	| Description |
 |----------|--------------|
 | pt_time_UTC	| yyyy-mm-dd hh:mm:ss format |
-| pt_lat	| WGS84 |
-| pt_lon	| WGS84 |
+| pt_lat	| Latitude, WGS84 |
+| pt_lon	| Longitude, WGS84 |
 | pt_install_UTC | yyyy-mm-dd hh:mm:ss format |
 | pt_uninstall_UTC | yyyy-mm-dd hh:mm:ss format |
-| install_method	| E.g. rebar, cinderblock |
+| gnss_install_UTC_start | yyyy-mm-dd hh:mm:ss format |
+| gnss_install_UTC_end | yyyy-mm-dd hh:mm:ss format |
+| gnss_uninstall_UTC_start | yyyy-mm-dd hh:mm:ss format |
+| gnss_uninstall_UTC_end | yyyy-mm-dd hh:mm:ss format |
+| install_method	| e.g. rebar, cinderblock |
 | pt_serial	| Seven digit ID number |
-| pt_level | In meters |
+| pt_level | Distance below water surface, in meters |
 | temperature | In °C |
-| driftID |
-| datetime | yyyy-mm-dd hh:mm:ss format |
-| pt_correction	| GNSS water surface elevation minus PT level, in meters |
-| pt_wse_sd	| Uncertainty in meters, equal to all variance in all offsets used to create PT water surface elevation plus PT measurement error |
-| pt_wse | PT correction plus PT level, in meters |
+| driftID_install | SWOTCalVal_campaignshortname_GNSS_L0_instrumentname_startdatetime_enddatetime |
+| driftID_uninstall | SWOTCalVal_campaignshortname_GNSS_L0_instrumentname_startdatetime_enddatetime |
+| datetime | yyyy-mm-dd hh:mm:ss, PT 15 min logging intervals |
+| keyid | SWOTCalVal_campaignshortname_KEY_startdate_enddate.csv |
+| Date_GNSS_Install | m/dd/yyyy |
+| Date_GNSS_Uninstall | m/dd/yyyy |
+| Reach_ID | SWORD reach id |
+| Node_ID | SWORD node id |
+| drift_id_install | Munged drifts/reprocessed_yyyy_mm_dd/SWOTCalVal_campaignshortname_GNSS_L2_instrumentname_startdatetime_enddatetime_processingdatetime_filenumber |
+| drift_id_uninstall | Munged drifts/reprocessed_yyyy_mm_dd/SWOTCalVal_campaignshortname_GNSS_L2_instrumentname_startdatetime_enddatetime_processingdatetime_filenumber |
+| pt_correction_total_error_m_install | standard deviation of the wse (boat bobbing) and the GNSS average error, propagated (m) |
+| pt_correction_total_error_m_uninstall | standard deviation of the wse (boat bobbing) and the GNSS average error, propagated (m) |
+| pt_correction_offset_sd_m_install | PT correction offset standard deviation (m) |
+| pt_correction_offset_sd_m_uninstall | PT correction offset standard deviation (m) |
+| pt_correction_gnss_average_error_m_install | average error due to GNSS error (m) |
+| pt_correction_gnss_average_error_m_uninstall | average error due to GNSS error (m) |
+| mean_dt_pt_gnss_offset_calc_install | Mean time difference from PT measurement to GNSS pings (s) |
+| mean_dt_pt_gnss_offset_calc_uninstall | Mean time difference from PT measurement to GNSS pings (s) |
+| pt_correction_m_install	| GNSS water surface elevation minus PT level (m) |
+| pt_correction_m_uninstall	| GNSS water surface elevation minus PT level (m) |
+| t_test_means_p_value | T test p vales for difference between install and uninstall offsets |
+| in_out_diff | Difference between install and uninstall offset values (m) |
+| pt_correction_mean_total_error_m | standard deviation of the wse (boat bobbing) and the GNSS average error, propagated and averaged for install and uninstall (m)| 
+| pt_correction_mean_offset_sd_m | PT correction offset standard deviation, averaged for install and uninstall (m) |
+| final_offset_m | PT offset correction, averaged for install and uninstall (m) |
+| pt_wse_m | PT wse (m),  final_offset_m + pt_level |
+| flag | 0 = good |
 
 ## Calculate slopes and heights from drifts within nodes and reaches
 
