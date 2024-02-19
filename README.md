@@ -141,7 +141,7 @@ Error thresholds for data:
 
 - The correct_pt_to_gnss_only function reads in the raw PT files and the PT key files and IDs PTs based on their serial numbers. Check to make sure that the PTs in the key file exist and the csv files contain data. There are 11 lines of headers to skip when creating PT data frames in csv format. The PT data should log at 15min intervals and must be mutated to the standard POSIXct UTC time.
 
--The correct PT key file to join to the PT data is selected by the install and uninstall (in the water) time, which is always in the PT record. If the PT record is much shorter than expected, this is likely due to a mismatch between baro-corrected PT times and keyfile times.
+- The correct PT key file to join to the PT data is selected by the install and uninstall (in the water) time, which is always in the PT record. If the PT record is much shorter than expected, this is likely due to a mismatch between baro-corrected PT times and keyfile times.
 
 - The last step in data tidying is to merge PT files with the PT key file with a left join based on PT serial number, filtered to times when the PT was in the water (install and uninstall dates, and above the dry PT threshold).
 
@@ -213,6 +213,30 @@ Error thresholds for data:
 | final_offset_m | PT offset correction, averaged for install and uninstall (m) |
 | pt_wse_m | PT wse (m),  final_offset_m + pt_level |
 | flag | 0 = good |
+
+## Flyby offsets ##
+
+- The correct_PT_via_flyby function takes PTs flagged as problematic from the correct_PT_to GNSS_occupy_only and attempts to correct PT level to wse by using GNSS data from passing drifts within a set time and distance threshold. Output is stored in Flyby PT/reprocessed_yyyy_mm_dd.
+
+Error thresholds for data:
+
+**GNSS standard deviation:** 0.05 meters, how much variance is allowed in GNSS data when it is within the distance threshold
+
+**Time threshold:** 450 seconds (7.5 minutes), centered around PT collect, so 7.5 minutes before and after
+
+**Distance threshold:** 150 meters, PT must be within a 150 m radius of a GNSS drift
+
+- If the PT is flagged as 0 (good) or 1 (shift in raw data), do not run the correct_PT_via_flyby function and return a corrected PT dataframe with NA for flyby correction fields.
+
+- Read in all of the river's GNSS data and return a list of all GNSS files that fall within the PT record by datetime. If there are multiple versions of a GNSS file, take the most recent reprocessing date.
+
+- Create a bounding box of the GNSS max/min lat/lon and check to see if the PT is within the box. If so, join the PT and GNSS data with a difference inner join by datetime with a max distance based on the time threshold. A column with the seconds between the GNSS and PT measurements is added.
+
+- Take the dataframe of PT paired with GNSS by time (pt_with_gnss_time) and calculate a distance vector with the pairwise difference between every row's GNSS and PT using a haversine. Join the distance vector to the pt_with_gnss_time dataframe and filter by the distance threshold.
+
+- Calculate a flyby offset for the dataframe (gnss_wse-pt_level), making sure there is greater than the minimum number of GNSS points to create an offset
+
+
 
 ## Calculate slopes and heights from drifts within nodes and reaches
 
