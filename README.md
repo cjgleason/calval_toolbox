@@ -403,48 +403,75 @@ Reach water surface elevation and slope as campaignshortname_drift_node_geom_dri
 
 ### Calculate slopes and heights from PTs within nodes and reaches
 
-- Bring in the munged PTs, the key file, and SWORD reaches and nodes for the river of interest. Next, run the calculate_slope_wse_fromPT function.
+- Bring in the munged PTs, the key file, and SWORD reaches and nodes for the river of interest from the domain_file. Next, run the calculate_slope_wse_fromPT_flybys function.
 
-- Make a dataframe with the key file and munged PTs by a left join.
+- Define sources of error:
+  - alongstream error: 0.0001*200 m, error from downstream slope of a reach in a node (placeholder is 1e-4 slope over a 200m node)
+  - crossstream error: 0.005 m, error from PT not representing cross stream elevation/noise in node
+  - measurement error: 0.001 m, error from the PT measurment itself
 
-- To calculate node water surface elevation, group the PT dataframe by node ID and find the mean water surface elevation (in meters) for each node. Set the mean PT water surface precision to 0.001 m, the error of the PT instruments.
+- Make a dataframe with the key file and add an unique id (pt_id) column in case PT serial moves nodes in a river.
 
-- To calculate reach water surface elevation, group the PT dataframe by reach ID and find the mean water surface elevation (in meters) for each reach. Set the mean PT water surface precision to 0.001 m, the error of the PT instruments.
+- Read in SWORD and create a reach_length_df with reach id and length and a node_dist_df with node id, p_dist_out (upstream distance in meters from the river system outlet), and reach id.
 
-- To calculate slope, group PT data by upstream and downstream reach IDs and average water surface elevation over these variables. Uncertainty is the standard deviation of PT water surface elevations at the upstream and downstream reaches.  Slope is the mean upstream water surface elevation minus the mean downstream water elevation divided by reach length, segmented by time.
+- Next, read in PT files and create new pt_id field (pt_serial & nod_id) to prevent confusion if PT was geographically moved in river. Join key file to PT df with a left join by pt_id.
 
-- From these calculations, there are three csv files saved into the node and reach output directories, respectively:
+- To calculate node water surface elevation, group the PT dataframe by node ID and find the mean water surface elevation (m) for each node. Set the mean PT water surface precision (m) to the sum of alongstream, crossstream, and measurement error. Also include the PT with correction mean offset standard deviation (m) and total error (m).
 
-PT node water surface elevation:
+- To calculate reach water surface elevation, left join the reach dataframe to the PT dataframe and group by reach ID to find the mean water surface elevation (m) for each reach. 
+
+???Set the mean PT water surface precision to 0.001 m, the error of the PT instruments.???
+
+- To calculate slope, filter the key file to PTs that have data for us_reach_id and ds_reach_id and add the pt_id field. Get all PT data at the 15min intervals for the reach boundary PTs. Then seperately get the means of both the upstream and downstream reach boundary PT corrected water surface elevations (ideally there should be two PTs at reach boundaries). Total error for PT wse at each boudary is the square root of the (max mean pt wse minus the min mean pt wse)^2 plus the sum of the mean pt with correction total error^2. Join the upstream and downstream dataframes together by UTC time and reach ID. Also, join the reach length dataframe to get SWORD lengths.
+
+- Slope (m/m) is the mean upstream water surface elevation minus the mean downstream water elevation divided by reach length, segmented by time. The slope uncertainty (m/m) is the total PT error at the upstream and downstream reach boundary, propagated and divided by reach length.
+
+- From these calculations, there are three csv files saved into the node and reach output directories (Data frames/reprocessed_yyyy_mm_dd/node or Data frames/reprocessed_yyyy_mm_dd/reach):
+
+PT node water surface elevation saved as campaignshortname_PTserial_nodeID_PT_node_wse.csv:
 
 | Variable	| Description |
 |----------|--------------|
 | node_id	 | SWORD node ID |
 | pt_time_UCT	| yyyy-mm-dd hh:mm:ss format |
-| mean_node_wse_m	| Mean node water surface elevation in meters |
-| mean_pt_wse_precision_m	| In meters, instrument error, 0.001 m |
+| pt_id | PT serial_Node ID |
+| pt_serial | 7 digit PT serial number |
+| mean_node_wse_m	| Mean node water surface elevation (m) |
+| mean_pt_wse_precision_m	| Sum of alongstream, crossstream, and measurement error (m) |
+| pt_correction_sd | PT correction standard deviation (m) |
+| flag | 100 |
+| p_dist_out | Distance from river outlet calculated in SWORD (m) |
+| reach_id | SWORD reach ID |
 
-PT reach water surface elevation:
-
-| Variable	| Description |
-|----------|--------------|
-| reach_id	| SWORD reach ID |
-| pt_time_UCT	| yyyy-mm-dd hh:mm:ss format |
-| mean_reach_wse_m	| Mean reach water surface elevation, meters |
-| mean_pt_wse_precision_m	| In meters, instrument error, 0.001 m |
-
-PT reach slope:
+PT reach water surface elevation saved as campaignshortname_reachID_PT_reach_wse.csv:
 
 | Variable	| Description |
 |----------|--------------|
+| pt_time_UCT	| yyyy-mm-dd hh:mm:ss UTC format |
 | reach_id	| SWORD reach ID |
-| pt_time_UCT	| yyyy-mm-dd hh:mm:ss format |
-| slope	| Slope |
-| slope_precision	| Standard deviation of PT measurements |
+| mean_reach_wse_m	| Mean reach water surface elevation (m) |
+| nodelist | List of nodes used to generate reach products |
+| flaglist | ? |
+| mean_p_dist_out | mean distance to river outlet (as in SWORD) from nodes used in calculation (m) |
+
+PT reach slope saved as campaignshortname_PT_reach_slope.csv:
+
+| Variable	| Description |
+|----------|--------------|
+| pt_time_UCT	| yyyy-mm-dd hh:mm:ss UTC format |
+| mean_pt_wse_us_boundary_m | Mean upstream boundary PT wse (m) |
+| total_error_pt_wse_us_boudary | ? |
+| pt_serials_us | actually pt_ids (serial & node) |
+| flag_us | ? |
+| reach_id	| SWORD reach ID |
+| mean_pt_wse_ds_boundary_m | Mean downstream boundary PT wse (m) |
+| total_error_pt_wse_ds_boudary | ? |
+| pt_serials_ds | actually pt_ids (serial & node) |
+| flag_ds | ? |
+| slope_m_m	| Slope (m/m) |
+| slope_uncertainty_m_m	| ? |
 
 ## Define what drift goes with what SWOT overpass
-
-*Right now, this is set up with a fake SWOT pass ID and time.*
 
 Define thresholds for linking GNSS drifts to SWOT overpasses:
 
