@@ -451,7 +451,7 @@ PT reach water surface elevation saved as campaignshortname_reachID_PT_reach_wse
 | reach_id	| SWORD reach ID |
 | mean_reach_wse_m	| Mean reach water surface elevation (m) |
 | nodelist | List of nodes used to generate reach products |
-| flaglist | ? |
+| flaglist | PT error flags |
 | mean_p_dist_out | mean distance to river outlet (as in SWORD) from nodes used in calculation (m) |
 
 PT reach slope saved as campaignshortname_PT_reach_slope.csv:
@@ -460,16 +460,16 @@ PT reach slope saved as campaignshortname_PT_reach_slope.csv:
 |----------|--------------|
 | pt_time_UCT	| yyyy-mm-dd hh:mm:ss UTC format |
 | mean_pt_wse_us_boundary_m | Mean upstream boundary PT wse (m) |
-| total_error_pt_wse_us_boudary | ? |
+| total_error_pt_wse_us_boudary | Total error from upstream boundary PTs |
 | pt_serials_us | actually pt_ids (serial & node) |
-| flag_us | ? |
+| flag_us | PT error flags |
 | reach_id	| SWORD reach ID |
 | mean_pt_wse_ds_boundary_m | Mean downstream boundary PT wse (m) |
-| total_error_pt_wse_ds_boudary | ? |
+| total_error_pt_wse_ds_boudary | Total error from downstream boundary PTs |
 | pt_serials_ds | actually pt_ids (serial & node) |
-| flag_ds | ? |
+| flag_ds | PT error flags |
 | slope_m_m	| Slope (m/m) |
-| slope_uncertainty_m_m	| ? |
+| slope_uncertainty_m_m	| Slope uncertainty |
 
 ## Define what drift goes with what SWOT overpass
 
@@ -481,11 +481,15 @@ Define thresholds for linking GNSS drifts to SWOT overpasses:
 
 **Distance threshold:** Within 200m
 
-***These will be specific to each river and are subject to change/should be up for debate!***
+***These should be specific to each river and are subject to change/should be up for debate!***
 
-- Next, run the select_appropriate_drift function. 
+- Next, run the select_appropriate_drift function which matches GNSS drifts to SWOT granules. 
 
-- First, read in the node water surface elevation csv, convert time to POSTIXct, and calculate the time to SWOT overpass.
+- Create a list of SWOT pass names to process. Next, average the start and end date times of the granule to get a mean SWOT granule time in UTC.
+
+- The first check is if the SWOT time matches the drift time.
+
+- Read in the node water surface elevation csv, convert time to POSTIXct, and calculate the time to SWOT overpass.
 
 - Make an index of what drift node observations to keep and remove based on the time threshold.
 
@@ -503,16 +507,16 @@ Define thresholds for linking GNSS drifts to SWOT overpasses:
 
 - Next, filter by water level within the water surface elevation threshold to find ‘good’ matches of PT and drift data.
 
-Group by node and drift ID before computing summary statistics to be output in the final csv dataframe of SWOT drift pairs:
+Group by node and drift ID before computing summary statistics to be output in the final csv dataframe of SWOT drift pairs in Matched drifts/reprocessed_yyyy_mm_dd/ SWOT_L2_HR_RiverSP_Match_001_265_cycle_pass_continent_startdatetime_enddatetimematched__processdate_campaignshortname:
 
 | Variable	| Description |
 |----------|--------------|
 | node_id	| SWORD node ID |
-| drift_id	| Following calval naming conventions |
-| drift_pt_dist_km_bar	| Distance from drift to PT in km |
-| wse_difference_m_bar | Water surface elevation difference between drift and PT, in meters |
-| wse_difference_m_sd	| Standard deviation of water surface elevation difference, in meters |
-| swot_passid	| Fake swot pass (for now!) |
+| drift_id	| Munged drifts/reprocessed_yyyy_mm_dd/ SWOTCalVal_campaignshortname_GNSS_L2_instrumentname_startdatetime_enddatetime_processingdatetime_filenumber |
+| drift_pt_dist_km_bar	| Distance from drift to PT (km) |
+| wse_difference_m_bar | Water surface elevation difference between drift and PT (m) |
+| wse_difference_m_sd	| Standard deviation of water surface elevation difference (m) |
+| swot_passid	| SWOT_L2_RiverSP_Match_cycle_pass_continent_startdatetime_enddatetime |
 | swot_time_UTC	| yyyy-mm-dd hh:mm:ss format |
 
 
