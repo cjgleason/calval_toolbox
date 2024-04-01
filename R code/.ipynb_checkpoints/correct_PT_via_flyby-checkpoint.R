@@ -1,11 +1,11 @@
 Sys.umask('002')
 #dank flyby script
 correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directory,
-                              gnss_sd_thresh,time_thresh,dist_thresh,output_dir){
+                              gnss_sd_thresh,time_thresh,dist_thresh,output_dir,rivername){
   
   if (file.exists(paste0('/nas/cee-water/cjgleason/calval/Processed data/PT_stories/','flyby_',pt_file_in))){
     file.remove(paste0('/nas/cee-water/cjgleason/calval/Processed data/PT_stories/','flyby_',pt_file_in))}
-
+  
   
   
   # 
@@ -27,6 +27,12 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
   #if flag === 0,1, were good, do nothing
   #if flag === else, we need to do stuff
   flag=read.csv(paste0(munged_PT_directory,pt_file_in), header = TRUE, nrow = 1)$flag
+  split=strsplit(pt_file_in,'_')
+    if (split[2]!=rivername){
+        break
+    }
+    print('works')
+    bonk
   # stop here if flag is 0, the file is good, or if flag =1,
   #the file has only a shift in the raw record
   pt_data=read.csv(paste0(munged_PT_directory,pt_file_in), header = TRUE, stringsAsFactors = FALSE)%>%
@@ -38,9 +44,11 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
     pt_data_out=pt_data%>%
       mutate(flyby_correction_m= NA,
              flyby_total_error_m=NA,
+             pt_with_correction_mean_offset_sd_m=pt_correction_offset_sd_m_install,
+             pt_with_correction_total_error_m=pt_correction_mean_total_error_m,
              pt_with_flyby_wse_m=pt_wse_m,
-             flag=as.hexmode(new_flag))
-   
+             flag=new_flag)
+    
     write.csv(pt_data_out,paste0(output_dir,'flyby_',pt_file_in),row.names = FALSE)
     return(NA)} 
   
@@ -139,12 +147,12 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
         select(-c(gnss_ellipsoid)) # comma in column that messes with append, so I rid.
       #elegance in klugosity itself
       # writing row in the csv file 
-        
+      
       write.table(offset_df, file = paste0('/nas/cee-water/cjgleason/calval/Processed data/PT_stories/','flyby_',pt_file_in),
                   sep = ",", 
                   append = TRUE, quote = FALSE, 
                   col.names = TRUE, row.names = FALSE) 
-
+      
       
       offset_df=offset_df%>%
         summarize( flyby_pt_correction_m= mean(flyby_offset,na.rm=TRUE),
@@ -166,7 +174,7 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
                    gnss_pings_used=n()
                    
         )
-
+      
       return(offset_df)
       
     }
@@ -197,16 +205,18 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
   stopCluster(cl)
   
   
-
+  
   
   if (is.null(flyby_offsets) ){
     new_flag=new_flag + 100000
     pt_data_out=pt_data%>%
       mutate(flyby_correction_m= NA,
              flyby_total_error_m=NA,
+             pt_with_correction_mean_offset_sd_m=pt_correction_offset_sd_m_install,
+             pt_with_correction_total_error_m=pt_correction_mean_total_error_m,
              pt_with_flyby_wse_m=pt_wse_m,
-             flag=as.hexmode(new_flag))
-              
+             flag=new_flag)
+    
     write.csv(pt_data_out,paste0(output_dir,'flyby_',pt_file_in),row.names = FALSE)
     
     #filter for noise
@@ -220,17 +230,17 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
     pt_data_out=pt_data%>%
       mutate(flyby_correction_m= NA,
              flyby_total_error_m=NA,
+             pt_with_correction_mean_offset_sd_m=pt_correction_offset_sd_m_install,
+             pt_with_correction_total_error_m=pt_correction_mean_total_error_m,
              pt_with_flyby_wse_m=pt_wse_m,
-             flag=as.hexmode(new_flag))
+             flag=new_flag)
     write.csv(pt_data_out,paste0(output_dir,'flyby_',pt_file_in),row.names = FALSE)
     
     return(NA)
   }
   
   
-  
-  
-  plot(as.POSIXct(flyby_offsets$pt_time_UTC),flyby_offsets$flyby_pt_correction_m)
+  # plot(as.POSIXct(flyby_offsets$pt_time_UTC),flyby_offsets$flyby_pt_correction_m)
   print(paste('flag is',pt_data$flag[1]))
   print(paste('install offset is',pt_data$pt_correction_m_install[1]))
   print(paste('uninstall offset is',pt_data$pt_correction_m_uninstall[1]))
@@ -238,7 +248,6 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
   print(paste('max of flyby offsets is ',max(flyby_offsets$flyby_pt_correction_m)))
   print(paste('number of flyby offsets is', nrow(flyby_offsets)))
   
-
   #parse flags--------
   #if flag is 10, there was an install only
   #do the grouped offsets agree with the install?
@@ -260,7 +269,7 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
     mean_flyby=mean(flyby_offsets$flyby_pt_correction_m)
     sd_flyby=sd(flyby_offsets$flyby_pt_correction_m)
     #install offsets repeat, so take just the first
-    offset_vs_flyby=pt_data$pt_correction_m_install[1] - mean_flyby
+    offset_vs_flyby=pt_data$final_offset_m[1] - mean_flyby
     
     
     if (offset_vs_flyby < gnss_sd_thresh){
@@ -271,8 +280,10 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
         pt_data_out=pt_data%>%
           mutate(flyby_correction_m= NA,
                  flyby_total_error_m=NA,
+                 pt_with_correction_mean_offset_sd_m=pt_correction_offset_sd_m_install,
+                 pt_with_correction_total_error_m=pt_correction_mean_total_error_m,
                  pt_with_flyby_wse_m=pt_wse_m,
-                 flag=as.hexmode(new_flag))
+                 flag=new_flag)
         
         # write.csv(pt_data_out,paste0(output_dir,'flyby_',pt_file_in),row.names = FALSE)
         # return(NA)
@@ -281,8 +292,10 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
         pt_data_out=pt_data%>%
           mutate(flyby_correction_m= NA,
                  flyby_total_error_m=NA,
+                 pt_with_correction_mean_offset_sd_m=pt_correction_offset_sd_m_install,
+                 pt_with_correction_total_error_m=pt_correction_mean_total_error_m,
                  pt_with_flyby_wse_m=pt_wse_m,
-                 flag=as.hexmode(new_flag))
+                 flag=new_flag)
         # 
         # write.csv(pt_data_out,paste0(output_dir,'flyby_',pt_file_in),row.names = FALSE)
       }
@@ -304,8 +317,10 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
         mutate(flyby_correction_m= flyby_correction,
                #                               #error from each   +     error in summarizing across offsets
                flyby_total_error_m=sqrt(         (flyby_total)^2  + flyby_correction_sd^2 ),
+               pt_with_correction_mean_offset_sd_m=flyby_correction_sd,
+               pt_with_correction_total_error_m=flyby_total,
                pt_with_flyby_wse_m=pt_level+flyby_correction,
-               flag=as.hexmode(new_flag))
+               flag=new_flag)
       # write.csv(pt_data_out,paste0(output_dir,'flyby_',pt_file_in),row.names = FALSE)
       # return(NA)
       
@@ -313,103 +328,156 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
     }
     
     
+    
   }else{ # end of 10 or 11 flag checks
     
-    #all non 10, 11 flags 
-    if (nrow(flyby_offsets>=3)){
-      
-      #add the install and uninstall here
-      
-      #### get the og correction
-      install_mean=pt_data$pt_correction_m_install[1]
-      uninstall_mean=pt_data$pt_correction_m_uninstall[1]
-      install_time=pt_data$gnss_install_UTC_start[1]
-      uninstall_time=pt_data$gnss_uninstall_UTC_start[1]
-      
-      #### add them to the offset dataframe
-      dummy_df=data.frame(pt_time_UTC =rbind(install_time,uninstall_time),
-                          flyby_pt_correction_m=rbind(install_mean,uninstall_mean),
-                          flyby_pt_correction_total_error_m=NA,
-                          flyby_pt_correction_gnss_average_error_m=NA,
-                          flyby_pt_correction_offset_sd_m=NA,
-                          flyby_drift_id=rbind('install','uninstall'),
-                          pt_serial=cbind(flyby_offsets$pt_serial[1:2]),
-                          gnss_pings_used=600
-      )
-      
-      settling_df=rbind(flyby_offsets,dummy_df)
-      
-      
-      ###
-      
-      #is linear fit positive slope? use a linear fit
-      linear_fit=lm(flyby_pt_correction_m ~ as.integer(as.POSIXct(pt_time_UTC)), data = settling_df)
-      slope=linear_fit$coefficients[2]
-      intercept=linear_fit$coefficients[1]
-      residual_sigma=summary(linear_fit)$sigma
-      #if so, how monotonic is that increase? use a difference vector
-      #shift = (n+1)-n
-      monotonizer=(c(settling_df$flyby_pt_correction_m,0) -c(0,settling_df$flyby_pt_correction_m))[2:(nrow(settling_df))]
-      #add all those differences. if total is positive, that means more increases than decreases
-      monotic_sum=sum(monotonizer)
-      
-      if (slope >0 & monotic_sum >0){
-        #pt is settling
-        #linear fit. no way we know it is linear!!!!
-        new_flag= new_flag + 1000000
-        flyby_total=(sum(flyby_offsets$flyby_pt_correction_total_error_m)/nrow(flyby_offsets))
-        
-        pt_data_out=pt_data%>%
-          mutate(flyby_correction_m= (slope*as.integer(as.POSIXct(pt_time_UTC)))+intercept)%>%
-          #                    #error from each                             + error from linear fit
-          mutate(flyby_total_error_m=sqrt( (flyby_total)^2 + residual_sigma^2),
-                 pt_with_flyby_wse_m=pt_level+flyby_correction_m,
-                 flag=as.hexmode(new_flag))
-        # write.csv(pt_data_out,paste0(output_dir,'flyby_',pt_file_in),row.names = FALSE)
-        # return(NA)
-        
-      } else {
-        #pt not settling 
-        new_flag= new_flag + 10000
-        
-        mean_flyby=mean(flyby_offsets$flyby_pt_correction_m)
-        sd_flyby=sd(flyby_offsets$flyby_pt_correction_m)
-        install_mean=pt_data$pt_correction_m_install[1]
-        uninstall_mean=pt_data$pt_correction_m_uninstall[1]
-        
-        flyby_correction=mean(c(mean_flyby,install_mean,uninstall_mean))
-        flyby_correction_sd=sd(c(mean_flyby,install_mean,uninstall_mean))
-        
-        flyby_total=(sum(flyby_offsets$flyby_pt_correction_total_error_m)/nrow(flyby_offsets))
-        
-        pt_data_out=pt_data%>%
-          mutate(flyby_correction_m= flyby_correction,
-                 #                               #error from each              +     error in summarizing across offsets
-                 flyby_total_error_m=sqrt(         (flyby_total)^2  + flyby_correction_sd^2 ),
-                 pt_with_flyby_wse_m=pt_level+flyby_correction,
-        flag=as.hexmode(new_flag))
-        # write.csv(pt_data_out,paste0(output_dir,'flyby_',pt_file_in),row.names = FALSE)
-        # return(NA)
-      } # end of the settlign check
-      
-    } else { # less than than 3 datapoints
-      new_flag= new_flag + 100000
-      #write corrections
-      pt_data_out=pt_data%>%
-        mutate(flyby_correction_m= NA,
-               flyby_total_error_m=NA,
-               pt_with_flyby_wse_m=pt_wse_m,
-               flag=as.hexmode(new_flag))
-      
-      # write.csv(pt_data_out,paste0(output_dir,pt_file_in),row.names = FALSE)
-      # return(NA)
-    }
+    #We check all flags not 10 or 11#
+    mean_flyby=mean(flyby_offsets$flyby_pt_correction_m)
+    sd_flyby=sd(flyby_offsets$flyby_pt_correction_m)
+    #install offsets repeat, so take just the first
+    offset_vs_flyby=pt_data$final_offset_m[1] - mean_flyby
     
+  
+    if (offset_vs_flyby < gnss_sd_thresh){
+      if(nrow(flyby_offsets)>1){
+        #we're good! the offsets match the install
+        #add these two fields, rewrite the file
+        new_flag=new_flag + 10000000
+        pt_data_out=pt_data%>%
+          mutate(flyby_correction_m= NA,
+                 flyby_total_error_m=NA,
+                 pt_with_correction_mean_offset_sd_m=pt_correction_offset_sd_m_install,
+                 pt_with_correction_total_error_m=pt_correction_mean_total_error_m,
+                 pt_with_flyby_wse_m=pt_wse_m,
+                 flag=new_flag)
+        
+        # write.csv(pt_data_out,paste0(output_dir,'flyby_',pt_file_in),row.names = FALSE)
+        # return(NA)
+      } else {
+        #all non 10, 11 flags 
+        if (nrow(flyby_offsets>=3)){
+          
+          #add the install and uninstall here
+          
+          #### get the og correction
+          install_mean=pt_data$pt_correction_m_install[1]
+          uninstall_mean=pt_data$pt_correction_m_uninstall[1]
+          install_time=pt_data$gnss_install_UTC_start[1]
+          uninstall_time=pt_data$gnss_uninstall_UTC_start[1]
+          
+          #### add them to the offset dataframe
+          dummy_df=data.frame(pt_time_UTC =rbind(install_time,uninstall_time),
+                              flyby_pt_correction_m=rbind(install_mean,uninstall_mean),
+                              flyby_pt_correction_total_error_m=NA,
+                              flyby_pt_correction_gnss_average_error_m=NA,
+                              flyby_pt_correction_offset_sd_m=NA,
+                              flyby_drift_id=rbind('install','uninstall'),
+                              pt_serial=cbind(flyby_offsets$pt_serial[1:2]),
+                              gnss_pings_used=600
+          )
+          
+          settling_df=rbind(flyby_offsets,dummy_df)
+          
+          
+          ###
+          
+          #is linear fit positive slope? use a linear fit
+          linear_fit=lm(flyby_pt_correction_m ~ as.integer(as.POSIXct(pt_time_UTC)), data = settling_df)
+          slope=linear_fit$coefficients[2]
+          intercept=linear_fit$coefficients[1]
+          residual_sigma=summary(linear_fit)$sigma
+          #if so, how monotonic is that increase? use a difference vector
+          #shift = (n+1)-n
+          monotonizer=(c(settling_df$flyby_pt_correction_m,0) -c(0,settling_df$flyby_pt_correction_m))[2:(nrow(settling_df))]
+          #add all those differences. if total is positive, that means more increases than decreases
+          monotic_sum=sum(monotonizer)
+          
+          if (slope >0 & monotic_sum >0){
+            #pt is settling
+            #linear fit. no way we know it is linear!!!!
+            new_flag= new_flag + 1000000
+            flyby_total=(sum(flyby_offsets$flyby_pt_correction_total_error_m)/nrow(flyby_offsets))
+            
+            pt_data_out=pt_data%>%
+              mutate(flyby_correction_m= (slope*as.integer(as.POSIXct(pt_time_UTC)))+intercept)%>%
+              #                    #error from each                             + error from linear fit
+              mutate(flyby_total_error_m=sqrt( (flyby_total)^2 + residual_sigma^2),
+                     pt_with_correction_mean_offset_sd_m=NA,
+                     pt_with_correction_total_error_m=flyby_total_error_m,
+                     pt_with_flyby_wse_m=pt_level+flyby_correction_m,
+                     flag=new_flag)
+            # write.csv(pt_data_out,paste0(output_dir,'flyby_',pt_file_in),row.names = FALSE)
+            # return(NA)
+            
+          } else {
+            #pt not settling 
+            new_flag= new_flag + 10000
+            mean_flyby=mean(flyby_offsets$flyby_pt_correction_m)
+            sd_flyby=sd(flyby_offsets$flyby_pt_correction_m)
+            install_mean=pt_data$pt_correction_m_install[1]
+            uninstall_mean=pt_data$pt_correction_m_uninstall[1]
+            
+            flyby_correction=mean(c(mean_flyby,install_mean,uninstall_mean))
+            flyby_correction_sd=sd(c(mean_flyby,install_mean,uninstall_mean))
+            
+            flyby_total=(sum(flyby_offsets$flyby_pt_correction_total_error_m)/nrow(flyby_offsets))
+            
+            pt_data_out=pt_data%>%
+              mutate(flyby_correction_m= flyby_correction,
+                     ##error from each              +     error in summarizing across offsets
+                     flyby_total_error_m=sqrt(         (flyby_total)^2  + flyby_correction_sd^2 ),
+                     pt_with_correction_mean_offset_sd_m=flyby_correction_sd,
+                     pt_with_correction_total_error_m=flyby_total,
+                     pt_with_flyby_wse_m=pt_level+flyby_correction,
+                     flag=new_flag)
+            # write.csv(pt_data_out,paste0(output_dir,'flyby_',pt_file_in),row.names = FALSE)
+            # return(NA)
+          } # end of the settlign check
+          
+        } else { # less than than 3 datapoints
+          new_flag= new_flag + 100000
+          #write corrections
+          pt_data_out=pt_data%>%
+            mutate(flyby_correction_m= NA,
+                   flyby_total_error_m=NA,
+                   pt_with_correction_mean_offset_sd_m=pt_correction_offset_sd_m_install,
+                   pt_with_correction_total_error_m=pt_correction_mean_total_error_m,
+                   pt_with_flyby_wse_m=pt_wse_m,
+                   flag=new_flag)
+          
+          # write.csv(pt_data_out,paste0(output_dir,pt_file_in),row.names = FALSE)
+          # return(NA)
+        }
+        
+        
+      }
+      
+    }else{#flybyoffset > gnss_thresh - we rid of this, what flag and do what??
+      new_flag=new_flag + 10000
+      mean_flyby=mean(flyby_offsets$flyby_pt_correction_m)
+      sd_flyby=sd(flyby_offsets$flyby_pt_correction_m)
+      install_mean=pt_data$pt_correction_m_install[1]
+      
+      flyby_correction=mean(c(mean_flyby,install_mean))
+      flyby_correction_sd=sd(c(mean_flyby,install_mean))
+      
+      flyby_total=(sum(flyby_offsets$flyby_pt_correction_total_error_m)/nrow(flyby_offsets))
+      
+      pt_data_out=pt_data%>%
+        mutate(flyby_correction_m= flyby_correction,
+               #                               #error from each   +     error in summarizing across offsets
+               flyby_total_error_m=sqrt(         (flyby_total)^2  + flyby_correction_sd^2 ),
+               pt_with_correction_mean_offset_sd_m=flyby_correction_sd,
+               pt_with_correction_total_error_m=flyby_total,
+               pt_with_flyby_wse_m=pt_level+flyby_correction,
+               flag=new_flag) 
+    }
   }
   
   write.csv(pt_data_out,paste0(output_dir,'flyby_',pt_file_in),row.names = FALSE)
+  
+  
 }#end function
-
 
 ###Flag Description###
 #0- all good
@@ -422,22 +490,19 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
 #1000000- pt is likely settling. Linear fit was applied.
 #10000000 - flybys agree with OG file. we did nothing
 
-munged_PT_directory= '/nas/cee-water/cjgleason/calval/Processed data/Brown/Munged PT/reprocessed_2023_12_20/'
-output_dir=          '/nas/cee-water/cjgleason/calval/Processed data/Brown/Flyby PT/reprocessed_2023_12_20/'
-pt_file_in=list.files(munged_PT_directory)
-munged_GNSS_directory='/nas/cee-water/cjgleason/calval/Processed data/Brown/Munged drifts/reprocessed_2023_12_20/'
-gnss_sd_thresh=0.05
-time_thresh=7.5*60
-dist_thresh=200
-
-
-lapply(pt_file_in,correct_PT_via_flyby,
-       munged_GNSS_directory=munged_GNSS_directory,
-       munged_PT_directory=munged_PT_directory,
-       time_thresh=time_thresh,
-       dist_thresh=dist_thresh,
-       gnss_sd_thresh=gnss_sd_thresh,
-       output_dir=output_dir)
-
-
-
+# munged_PT_directory= '/nas/cee-water/cjgleason/calval/Processed data/Brown/Munged PT/reprocessed_2023_12_20/'
+# output_dir=          '/nas/cee-water/cjgleason/calval/Processed data/Brown/Flyby PT/reprocessed_2023_12_20/'
+# pt_file_in=list.files(munged_PT_directory)
+# munged_GNSS_directory='/nas/cee-water/cjgleason/calval/Processed data/Brown/Munged drifts/reprocessed_2023_12_20/'
+# gnss_sd_thresh=0.05
+# time_thresh=7.5*60
+# dist_thresh=200
+# 
+# 
+# lapply(pt_file_in,correct_PT_via_flyby,
+#        munged_GNSS_directory=munged_GNSS_directory,
+#        munged_PT_directory=munged_PT_directory,
+#        time_thresh=time_thresh,
+#        dist_thresh=dist_thresh,
+#        gnss_sd_thresh=gnss_sd_thresh,
+#        output_dir=output_dir)

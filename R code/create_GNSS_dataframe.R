@@ -2,6 +2,20 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
   library(ncdf4)
   library(stringr)
   library(dplyr)
+  
+  # hubname='UNC'
+  # rivername='YR'
+  # continent='na'
+  # utm_zone=6
+  # PT_key_file='SWOTCalVal_YR_KEY_20230521_20230923.csv'
+  # 
+  # 
+  #   gnss_drift_data_directory=paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/From Andy/UNC_netCDFs/')
+  #   output_directory=paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Munged drifts/')
+  #   naughty_bin_directory=paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Flagged drifts/')
+  #   log_file = list.files(gnss_drift_data_directory)
+  #   log_file = log_file[grep("_YR_",log_file)][2]
+  #   gnss_nc=nc_open(paste0(gnss_drift_data_directory,log_file))
     
     #this takes correcte GNSS and writes it to file, applying our cleanup QA QC
   
@@ -57,18 +71,23 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
     #R's native POSIXCT also doesn't have leap seconds, so we're good
     mutate(gnss_time_UTC = as.POSIXct(gnss_time_tai-37,origin='2000-01-01 00:00:00',tz='UTC' ))%>% # +37 because netcdf states a 37 second difference between TAI and UTC. only apply this here
     #need this to join, but let's preserve original
-    filter(gnss_surf_flag==12)%>%
-    filter(gnss_motion_flag==2)%>%
+    # 3/25 - comment out for if statement with BM surveys for NS #
+    # filter(gnss_surf_flag==12)%>%
+    # filter(gnss_motion_flag==2)%>%
     mutate(gnss_ellipsoid=gnss_ellipsoid)%>%
     #filter for self ID uncertainty at 5cm
     filter(gnss_uncertainty_m<0.05)%>%
     mutate(drift_id= sub('',"",log_file))
  
-    
-#     print(gnss_motion_flag)
-#     print(gnss_log)
-#     print(log_file)
-#     bonk
+ if (rivername =='NS') {
+     if (!grepl("FINN|POE|REC1_20230928",log_file)){
+         gnss_log=gnss_log%>%
+         filter(gnss_surf_flag==12)%>%
+         filter(gnss_motion_flag==2)
+     }else{
+       print("BM survey, all motion and surface codes kept")
+     }
+ }
 
 #waimak is special
     if (rivername =='WK'){

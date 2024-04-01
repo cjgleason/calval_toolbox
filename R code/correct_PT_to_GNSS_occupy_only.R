@@ -1,6 +1,6 @@
 correct_PT_to_GNSS_occupy_only= function(raw_pt_file,master_key,dist_thresh,time_thresh,pt_data_directory,
-                                       gnss_drift_data_directory,QA_QC_PT_output_directory, flagged_pt_output_directory,
-                                       gnss_sd_thresh,offset_sd_thresh,change_thresh_15_min,dry_threshold){
+                                         gnss_drift_data_directory,QA_QC_PT_output_directory, flagged_pt_output_directory,
+                                         gnss_sd_thresh,offset_sd_thresh,change_thresh_15_min,dry_threshold){
 library(dplyr)
 library(stringr)
 library(tidyr)
@@ -10,15 +10,24 @@ library(bayesbio)
 library(ncdf4)
 library(lubridate)
 # 
-# #
-# hubname='UMass'
-# rivername='CR'
+# # #
+  
+# hubname='Brown'
+# rivername='NS'
 # continent='na'
-# #
+# PT_key_file= c('SWOTCalVal_NS_KEY_20230525_20230613.csv',
+#                'SWOTCalVal_NS_KEY_20230613_20230725.csv',
+#                'SWOTCalVal_NS_KEY_20230725_20230928.csv')
+# #WM
+# utm_zone=13 #NS= 13
+# 
 # setwd(paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/'))
 # working_dir=(paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/'))
 # domain_file=paste0(rivername,'_domain.csv')
 # paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/')
+# QA_QC_PT_output_directory=(paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Munged PT/reprocessed_2024_03_19/'))
+# flagged_pt_output_directory=(paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Flagged PT/reprocessed_2024_03_19/'))
+# 
 # 
 # dist_thresh_offset=300 # 150m *Trying 300 for WM to rid of 118-120 from naughty bin\n",
 # time_thresh= 15*60 #minutes as seconds, centered, so 15 =30 mins total time\n",
@@ -32,37 +41,34 @@ library(lubridate)
 # time_threshold_sec_match= 120*60 #two hour\n",
 # wse_threshold_m_match=0.05 #within 5cm\n",
 # distance_threshold_m_match =200 #within 200m\n",
-# #
 # 
-# PT_key_file=c('SWOTCalVal_CR_Key_20230322_20230614.csv',
-#               'SWOTCalVal_CR_Key_20230516_20230613.csv',
-#               'SWOTCalVal_CR_Key_20230613_20231128.csv') #CT\n",
-# utm_zone=18 #Ct= 18\n",
 # 
 # read_keys=function(keyfile){
+# 
 #   this_key= read.csv(keyfile,stringsAsFactors=FALSE, na.strings = c("","NA","na","NaN", " "))%>%
 #     mutate(keyid=keyfile)%>%
 #     mutate(pt_serial=as.integer(PT_Serial))
 # }
 # master_key= do.call(rbind,lapply(PT_key_file,read_keys))
-# pt_data_directory='/nas/cee-water/cjgleason/calval/xml_scripts/UMass/Munged/Munged__20230516/Munged__20230617/'
 # 
-# pt_data_directory='/nas/cee-water/cjgleason/calval/xml_scripts/UMass/Munged/'
+# pt_data_directory=paste0('/nas/cee-water/cjgleason/calval/xml_scripts/',hubname,'/Munged/')
 # 
-# # list.files(pt_data_directory, pattern='.csv', recursive=TRUE)
+# raw_pt_file=list.files(pt_data_directory, pattern='.csv', recursive = TRUE)[118]
 # 
-# raw_pt_file=list.files(pt_data_directory, pattern='.csv', recursive = TRUE)[197]#[197]
-# #raw_pt_file="SWOTCalVal_CR_PT_L1_PT017_20230402T000000_20230605T184500_20230628T160754.csv"
-# 
-# gnss_drift_data_directory='/nas/cee-water/cjgleason/calval/Processed data/UMass/Munged drifts/reprocessed_2023_12_20/'
-
+# gnss_drift_data_directory=paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Munged drifts/reprocessed_2024_03_19/')
+# # 
 
 #   ######## above here comment out ########
 #   
-
 #grab the serial number from the PT file itself. Standarized file
-pt_serial_file=as.integer(read.table(paste0(pt_data_directory,raw_pt_file), header = FALSE, nrow = 1)$V1)
+pt_serial_file_init = read.table(paste0(pt_data_directory,raw_pt_file), header= FALSE, nrow=1)$V1
+if (grepl(",,,,NA|,NA,NA,NA,NA|,,,,",pt_serial_file_init)){
+  pt_serial_file=(as.integer(gsub(",*NA,*|,*", "",pt_serial_file_init)))
+}else{
+  pt_serial_file=as.integer(pt_serial_file_init)
+}
 print(paste0(pt_data_directory,raw_pt_file))
+
 
 #read in master_key--------------
 keyfile=master_key%>%
@@ -118,10 +124,37 @@ if(any(c(sum1,sum2,sum3,sum4)>0)){ #this means we're in ampmtime.
     mutate(datetime=as.POSIXct(paste(Date,Time),format="%m/%d/%Y %I:%M:%S %p"))
 } else { #24 hour time
   pt_data=pt_data%>%
-    mutate(datetime=as.POSIXct(paste(Date,Time),format= "%Y/%m/%d %H:%M:%S"))
+    mutate(datetime=as.POSIXct(paste(Date,Time),format= "%Y/%m/%d %H:%M:%S")) 
 }
+
+if (is.null(pt_data$datetime)|is.na(pt_data$datetime)[1]){
+  pt_data=pt_data%>%
+    mutate(Date=as.POSIXct(Date, format="%m/%d/%Y"))%>%
+    mutate(datetime=as.POSIXct(paste(Date,Time),format= "%Y-%m-%d %H:%M:%S"))#%>%
+}else{print("Date is good")}
+
+if (year(pt_data$datetime[1])-2000 < 0){
+  pt_data=pt_data%>%
+    mutate(datetime=as.POSIXct(as.character(datetime),format="%y-%m-%d %H:%M:%S"))
+}else{print("Date is in correct format")}
 #-----------------------------------
 
+# Check for non 15 minute data (1 minute now), but maybe could do anything less than 15? #
+if (difftime(pt_data$datetime[2],pt_data$datetime[1],units="secs")<=60){
+  pt_data = pt_data%>%
+    mutate(datetime = lubridate::floor_date(datetime, unit = "15 mins")) %>% 
+                 group_by(datetime) %>% 
+                 summarise(Date = first(Date),
+                           Time = first(Time),
+                           ms= first(ms),
+                           Level = mean(Level),
+                           Temperature=mean(Temperature),
+                           pt_serial=first(pt_serial))%>%
+    mutate(Time=format(datetime ,format="%H:%M:%S"))%>%
+    select(Date,Time,ms,Level,Temperature,pt_serial,datetime)
+}else{
+  print("Data are 15 min")
+}
 #now, we have a multikey that will sow mass confusion later. We need to select.
 #the right keyfile from all the keyfiles, using the 'pt in the water' logic, which 
 #says that the keyfile indicates and install and uninstall (in the water) time, which is always
@@ -131,11 +164,16 @@ if(any(c(sum1,sum2,sum3,sum4)>0)){ #this means we're in ampmtime.
 pt_mintime=min(pt_data$datetime,na.rm=TRUE)
 pt_maxtime=max(pt_data$datetime,na.rm=TRUE)
 
+# Need n if statement here for when install or uninstall end is next day######
 keyfile_check=filter(keyfile,pt_serial==pt_serial_file)%>%
   mutate(  pt_install_UTC=as.POSIXct(paste(Date_PT_Install,Time_PT_Install_UTC),format= "%m/%d/%Y %H:%M"),
            pt_uninstall_UTC=as.POSIXct(paste(Date_PT_Uninstall,Time_PT_Uninstall_UTC),format= "%m/%d/%Y %H:%M"),
-           gnss_install_UTC=as.POSIXct(paste(Date_GNSS_Install,Time_GNSS_Install_End_UTC),format= "%m/%d/%Y %H:%M"),
-           gnss_uninstall_UTC=as.POSIXct(paste(Date_GNSS_Uninstall,Time_GNSS_Uninstall_Start_UTC),format= "%m/%d/%Y %H:%M"))#%>%
+           # gnss_install_UTC=as.POSIXct(paste(Date_GNSS_Install,Time_GNSS_Install_End_UTC),format= "%m/%d/%Y %H:%M"),
+           gnss_install_UTC=ifelse(Time_GNSS_Install_End_UTC < Time_GNSS_Install_Start_UTC,
+                  as.POSIXct(paste(Date_GNSS_Install,Time_GNSS_Install_End_UTC),format= "%m/%d/%Y %H:%M:%S")+86400,
+                  as.POSIXct(paste(Date_GNSS_Install,Time_GNSS_Install_End_UTC),format= "%m/%d/%Y %H:%M:%S")),
+           gnss_install_UTC=as.POSIXct(gnss_install_UTC, format="%m/%d/%Y %H:%M:%S", origin ="01/01/1970 00:00:00"),
+           gnss_uninstall_UTC=as.POSIXct(paste(Date_GNSS_Uninstall,Time_GNSS_Uninstall_Start_UTC),format= "%m/%d/%Y %H:%M:%S"))#%>%
 #check for the %in% here
 keyfile_check2 = filter(keyfile_check, gnss_install_UTC >= (pt_mintime) )%>%
   filter(case_when(is.na(gnss_uninstall_UTC) ~   floor_date(pt_uninstall_UTC, unit="15 mins") <= pt_maxtime,  
@@ -172,13 +210,20 @@ pt_data=pt_data %>%
   filter(pt_serial==pt_serial_file)%>% #limit to just the PT we want. The filter above should take care 
   #of the case where the serial is not in the key file
   # This is where the Munged_PT columns come from key file - 12/20 added reach and nodeID. 1/05 added gnss install end and gnss uninstall start to limit
+    # Must add if statement to check going over UTC day - if end hour is < start hour, then end =date +1
   transmute(pt_time_UTC=pt_time_UTC,pt_lat=pt_Lat,pt_lon=pt_Lon,
             pt_install_UTC=as.POSIXct(paste(Date_PT_Install,Time_PT_Install_UTC),format= "%m/%d/%Y %H:%M"),
             pt_uninstall_UTC=as.POSIXct(paste(Date_PT_Uninstall,Time_PT_Uninstall_UTC),format= "%m/%d/%Y %H:%M"),
-            gnss_install_UTC_start=as.POSIXct(paste(Date_GNSS_Install,Time_GNSS_Install_Start_UTC),format= "%m/%d/%Y %H:%M"),
-            gnss_install_UTC_end = as.POSIXct(paste(Date_GNSS_Install,Time_GNSS_Install_End_UTC),format= "%m/%d/%Y %H:%M"),
-            gnss_uninstall_UTC_start = as.POSIXct(paste(Date_GNSS_Uninstall,Time_GNSS_Uninstall_Start_UTC),format= "%m/%d/%Y %H:%M"), 
-            gnss_uninstall_UTC_end=as.POSIXct(paste(Date_GNSS_Uninstall,Time_GNSS_Uninstall_End_UTC),format= "%m/%d/%Y %H:%M"),
+            gnss_install_UTC_start=as.POSIXct(paste(Date_GNSS_Install,Time_GNSS_Install_Start_UTC),format= "%m/%d/%Y %H:%M:%S"),
+            gnss_install_UTC_end = ifelse(Time_GNSS_Install_End_UTC < Time_GNSS_Install_Start_UTC,
+                                          as.POSIXct(paste(Date_GNSS_Install,Time_GNSS_Install_End_UTC),format= "%m/%d/%Y %H:%M:%S")+86400,
+                                          as.POSIXct(paste(Date_GNSS_Install,Time_GNSS_Install_End_UTC),format= "%m/%d/%Y %H:%M:%S")),
+            gnss_install_UTC_end = as.POSIXct(gnss_install_UTC_end,format="%m/%d/%Y %H:%M:%S", origin ="01/01/1970 00:00:00"),
+            gnss_uninstall_UTC_start = as.POSIXct(paste(Date_GNSS_Uninstall,Time_GNSS_Uninstall_Start_UTC),format= "%m/%d/%Y %H:%M:%S"),
+            gnss_uninstall_UTC_end = ifelse(Time_GNSS_Uninstall_End_UTC < Time_GNSS_Uninstall_Start_UTC,
+                                          as.POSIXct(paste(Date_GNSS_Uninstall,Time_GNSS_Uninstall_End_UTC),format= "%m/%d/%Y %H:%M:%S")+86400,
+                                          as.POSIXct(paste(Date_GNSS_Uninstall,Time_GNSS_Uninstall_End_UTC),format= "%m/%d/%Y %H:%M:%S")),
+            gnss_uninstall_UTC_end=as.POSIXct(gnss_uninstall_UTC_end,format="%m/%d/%Y %H:%M:%S", origin ="01/01/1970 00:00:00"),
             install_method=Install_method, pt_serial=pt_serial,         
             pt_level=Level,temperature=Temperature,
             driftID_install=driftID_install,driftID_uninstall=driftID_uninstall,
@@ -258,8 +303,7 @@ get_all_gnss=function(log_df_row){
   #We need to find the L2 version
   logstring=str_replace(log_df_row['value'],"L0",'L2')
   splitter=strsplit(logstring,'_')[[1]]
-  
-  string_to_match=paste(splitter[6], splitter[7],sep='_')
+  string_to_match=paste(splitter[5], splitter[6], splitter[7],sep='_')
   correct_drift_index=which(!is.na(str_match(list.files(gnss_drift_data_directory),string_to_match)))
   driftstring=list.files(gnss_drift_data_directory,full.names=TRUE)[correct_drift_index]
   
@@ -353,7 +397,7 @@ offset_dataframe= difference_inner_join(pt_data_for_offset,gnss_log,max_dist=tim
 
 #now, filter for times within the install and uninstall. this will solve the TP issue
 #nested if else statement needed to limit the GNSS time to occupy periods
-#note that the PT has already been limited to thsi timeframe, but we've just 
+#note that the PT has already been limited to this timeframe, but we've just 
 #joined in a new GNSS file that is broader
 #the if statement is in case there is only an install
 
@@ -367,7 +411,7 @@ if (is.na(offset_dataframe$gnss_uninstall_UTC_start[1])){
 
 offset_dataframe=offset_dataframe %>%
   
-  #since we are doing thsi by keyfile, we don't need to group by keyid
+  #since we are doing this by keyfile, we don't need to group by keyid
   
   #the grouping variable is important. We want to assign the gnss to the closest ping,
   #but, if all we care about is an install or uninstall then we are going to obliterate 
@@ -376,6 +420,8 @@ offset_dataframe=offset_dataframe %>%
   
   group_by(occupy_id,drift_id)%>%
   mutate(offset=(gnss_wse-pt_level))
+
+
 
 
 # plot(filter(offset_dataframe,occupy_id=='install')$offset,ylim = c(-0.36,-0.18))
@@ -404,8 +450,6 @@ offset_dataframe=offset_dataframe %>%
 # 
 # points(rep(280,times=120),seq(point_a,point_b,length.out=120),col='orange')
 
-
-# browser()
 
 
 #to do a t-test, we need a column for install and one for uninstall  
@@ -598,7 +642,7 @@ filename=paste0(filename_base,'_',unique(final_pt$keyid))
 print(filename)
 print('this file passed all checks')
 
-
+# 
 write.csv(final_pt,file=paste0(QA_QC_PT_output_directory,filename),row.names=FALSE)
 
-  } # end of function
+ } # end of function

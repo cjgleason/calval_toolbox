@@ -11,14 +11,16 @@ library(ncdf4)
 library(lubridate)
 # 
 # #
-# hubname='UMass'
-# rivername='CR'
+# hubname='CU'
+# rivername='WM'
 # continent='na'
 # #
 # setwd(paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/'))
 # working_dir=(paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/'))
 # domain_file=paste0(rivername,'_domain.csv')
 # paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/')
+# 
+# 
 # 
 # dist_thresh_offset=300 # 150m *Trying 300 for WM to rid of 118-120 from naughty bin\n",
 # time_thresh= 15*60 #minutes as seconds, centered, so 15 =30 mins total time\n",
@@ -34,28 +36,30 @@ library(lubridate)
 # distance_threshold_m_match =200 #within 200m\n",
 # #
 # 
-# PT_key_file=c('SWOTCalVal_CR_Key_20230322_20230614.csv',
-#               'SWOTCalVal_CR_Key_20230516_20230613.csv',
-#               'SWOTCalVal_CR_Key_20230613_20231128.csv') #CT\n",
-# utm_zone=18 #Ct= 18\n",
+# PT_key_file= c('SWOTCalVal_WM_KEY_20230326_20230510.csv',
+#                'SWOTCalVal_WM_KEY_20230509_20230601.csv',
+#                'SWOTCalVal_WM_KEY_20230601_20230707.csv',
+#                'SWOTCalVal_WM_KEY_20230601_20230801.csv') #CT\n",
+# utm_zone=10#Ct= 18\n",
 # 
 # read_keys=function(keyfile){
+# 
 #   this_key= read.csv(keyfile,stringsAsFactors=FALSE, na.strings = c("","NA","na","NaN", " "))%>%
 #     mutate(keyid=keyfile)%>%
 #     mutate(pt_serial=as.integer(PT_Serial))
 # }
 # master_key= do.call(rbind,lapply(PT_key_file,read_keys))
-# pt_data_directory='/nas/cee-water/cjgleason/calval/xml_scripts/UMass/Munged/Munged__20230516/Munged__20230617/'
+# # pt_data_directory='/nas/cee-water/cjgleason/calval/xml_scripts/CU/Munged/Munged__20230516/Munged__20230617/'
 # 
-# pt_data_directory='/nas/cee-water/cjgleason/calval/xml_scripts/UMass/Munged/'
+# pt_data_directory='/nas/cee-water/cjgleason/calval/xml_scripts/CU/Munged/'
 # 
-# list.files(pt_data_directory, pattern='.csv', recursive=TRUE)
+# # list.files(pt_data_directory, pattern='.csv', recursive=TRUE)
 # 
-# raw_pt_file=list.files(pt_data_directory, pattern='.csv', recursive = TRUE)[457]
+# raw_pt_file=list.files(pt_data_directory, pattern='.csv', recursive = TRUE)[132]
 # #raw_pt_file="SWOTCalVal_CR_PT_L1_PT017_20230402T000000_20230605T184500_20230628T160754.csv"
 # 
-# gnss_drift_data_directory='/nas/cee-water/cjgleason/calval/Processed data/UMass/Munged drifts/reprocessed_2023_12_20/'
-#
+# gnss_drift_data_directory='/nas/cee-water/cjgleason/calval/Processed data/CU/Munged drifts/reprocessed_2024_02_01/'
+
 
 #   ######## above here comment out ########
 #   
@@ -122,6 +126,22 @@ if(any(c(sum1,sum2,sum3,sum4)>0)){ #this means we're in ampmtime.
 }
 #-----------------------------------
 
+# Check for non 15 minute data (1 minute now), but maybe could do anything less than 15? #
+if (difftime(pt_data$datetime[2],pt_data$datetime[1],units="secs")<=60){
+  pt_data = pt_data%>%
+    mutate(datetime = lubridate::floor_date(datetime, unit = "15 mins")) %>% 
+                 group_by(datetime) %>% 
+                 summarise(Date = first(Date),
+                           Time = first(Time),
+                           ms= first(ms),
+                           Level = mean(Level),
+                           Temperature=mean(Temperature),
+                           pt_serial=first(pt_serial))%>%
+    mutate(Time=format(datetime ,format="%H:%M:%S"))%>%
+    select(Date,Time,ms,Level,Temperature,pt_serial,datetime)
+}else{
+  print("Data are 15 min")
+}
 #now, we have a multikey that will sow mass confusion later. We need to select.
 #the right keyfile from all the keyfiles, using the 'pt in the water' logic, which 
 #says that the keyfile indicates and install and uninstall (in the water) time, which is always
@@ -172,6 +192,7 @@ pt_data=pt_data %>%
   filter(pt_serial==pt_serial_file)%>% #limit to just the PT we want. The filter above should take care 
   #of the case where the serial is not in the key file
   # This is where the Munged_PT columns come from key file - 12/20 added reach and nodeID. 1/05 added gnss install end and gnss uninstall start to limit
+    # Must add if statement to check going over UTC day - if end hour is < start hour, then end =date +1
   transmute(pt_time_UTC=pt_time_UTC,pt_lat=pt_Lat,pt_lon=pt_Lon,
             pt_install_UTC=as.POSIXct(paste(Date_PT_Install,Time_PT_Install_UTC),format= "%m/%d/%Y %H:%M"),
             pt_uninstall_UTC=as.POSIXct(paste(Date_PT_Uninstall,Time_PT_Uninstall_UTC),format= "%m/%d/%Y %H:%M"),
@@ -333,10 +354,16 @@ offset_dataframe= difference_inner_join(pt_data_for_offset,gnss_log,max_dist=tim
             gnss_time_UTC=as.POSIXct(gnss_time_UTC,format ="%Y-%m-%d %H:%M:%S"),
             gnss_wse=gnss_wse,pt_time_UTC=pt_time_UTC,
             pt_serial=pt_serial,
-            gnss_lat=gnss_Lat, gnss_lon=gnss_Lon, pt_lat=pt_lat, pt_lon=pt_lon,
-            keyid=keyid, pt_install_UTC=pt_install_UTC,
-            pt_uninstall_UTC=pt_uninstall_UTC,gnss_uncertainty_m=gnss_uncertainty_m,
-            dt_pt_gnss_offset_calc=dt_pt_gnss_offset_calc,drift_id=drift_id,
+            gnss_lat=gnss_Lat, 
+            gnss_lon=gnss_Lon, 
+            pt_lat=pt_lat, 
+            pt_lon=pt_lon,
+            keyid=keyid, 
+            pt_install_UTC=pt_install_UTC,
+            pt_uninstall_UTC=pt_uninstall_UTC,
+            gnss_uncertainty_m=gnss_uncertainty_m,
+            dt_pt_gnss_offset_calc=dt_pt_gnss_offset_calc,
+            drift_id=drift_id,
             occupy_id=occupy_id,
             gnss_install_UTC_start=gnss_install_UTC_start,
             gnss_install_UTC_end=gnss_install_UTC_end,
@@ -347,7 +374,7 @@ offset_dataframe= difference_inner_join(pt_data_for_offset,gnss_log,max_dist=tim
 
 #now, filter for times within the install and uninstall. this will solve the TP issue
 #nested if else statement needed to limit the GNSS time to occupy periods
-#note that the PT has already been limited to thsi timeframe, but we've just 
+#note that the PT has already been limited to this timeframe, but we've just 
 #joined in a new GNSS file that is broader
 #the if statement is in case there is only an install
 
@@ -361,7 +388,7 @@ if (is.na(offset_dataframe$gnss_uninstall_UTC_start[1])){
 
 offset_dataframe=offset_dataframe %>%
   
-  #since we are doing thsi by keyfile, we don't need to group by keyid
+  #since we are doing this by keyfile, we don't need to group by keyid
   
   #the grouping variable is important. We want to assign the gnss to the closest ping,
   #but, if all we care about is an install or uninstall then we are going to obliterate 
@@ -370,6 +397,8 @@ offset_dataframe=offset_dataframe %>%
   
   group_by(occupy_id,drift_id)%>%
   mutate(offset=(gnss_wse-pt_level))
+
+
 
 
 # plot(filter(offset_dataframe,occupy_id=='install')$offset,ylim = c(-0.36,-0.18))
@@ -398,8 +427,6 @@ offset_dataframe=offset_dataframe %>%
 # 
 # points(rep(280,times=120),seq(point_a,point_b,length.out=120),col='orange')
 
-
-# browser()
 
 
 #to do a t-test, we need a column for install and one for uninstall  
@@ -523,6 +550,7 @@ if(nrow(final_offset_df)==1){
   }
 }
 
+
 if (nrow(final_offset_df)==2){
   
 
@@ -556,11 +584,24 @@ final_offset_to_join=pivot_wider(final_offset_df, names_from = occupy_id,
     select(-keyid_install)%>%
     mutate(pt_serial=as.integer(pt_serial_install))%>%
     select(-pt_serial_install)%>%
+    mutate(drift_id_uninstall=NA,
+           pt_correction_total_error_m_uninstall=NA,
+           pt_correction_offset_sd_m_uninstall=NA,
+           pt_correction_gnss_average_error_m_uninstall=NA,
+           mean_dt_pt_gnss_offset_calc_uninstall=NA,
+           pt_correction_m_uninstall=NA)%>%
     mutate(t_test_means_p_value=t_test_means_p_value_install)%>%
     select(-t_test_means_p_value_install)%>%
     mutate(in_out_diff=NA,
            pt_correction_mean_total_error_m = pt_correction_total_error_m_install,
-           pt_correction_mean_offset_sd_m = pt_correction_offset_sd_m_install)
+           pt_correction_mean_offset_sd_m = pt_correction_offset_sd_m_install)%>%
+    select(drift_id_install, drift_id_uninstall, 
+           pt_correction_total_error_m_install,pt_correction_total_error_m_uninstall,
+           pt_correction_offset_sd_m_install,pt_correction_offset_sd_m_uninstall,
+           pt_correction_gnss_average_error_m_install,pt_correction_gnss_average_error_m_uninstall,
+           mean_dt_pt_gnss_offset_calc_install,mean_dt_pt_gnss_offset_calc_uninstall,
+           pt_correction_m_install, pt_correction_m_uninstall,
+           keyid,pt_serial,t_test_means_p_value,in_out_diff,pt_correction_mean_total_error_m,pt_correction_mean_offset_sd_m)
   
   
 }
@@ -578,7 +619,7 @@ filename=paste0(filename_base,'_',unique(final_pt$keyid))
 print(filename)
 print('this file passed all checks')
 
-
+# 
 write.csv(final_pt,file=paste0(QA_QC_PT_output_directory,filename),row.names=FALSE)
 
   } # end of function

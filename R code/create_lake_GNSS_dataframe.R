@@ -1,8 +1,23 @@
+Sys.umask('002')
 create_lake_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_directory){
   library(ncdf4)
   library(stringr)
   library(dplyr)
   
+  # hubname='UNC'
+  # continent='na'
+  # lakename='YF'
+  # PT_key_file=c('SWOTCalVal_YF_KEY_20230521_20230923.csv',
+  #               'SWOTCalVal_YF_KEY_20230603_20230722.csv') #WM
+  # utm_zone=6 #WM= 10
+  # 
+  # 
+  #   gnss_drift_data_directory=paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/From Andy/UNC_netCDFs/')
+  #   output_directory=paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Munged drifts/')
+  #   naughty_bin_directory=paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Flagged drifts/')
+  #   log_file = list.files(gnss_drift_data_directory)
+  #   log_file = log_file[grep("_YF_",log_file)]
+  #   gnss_nc=nc_open(paste0(gnss_drift_data_directory,log_file))
     #create GNSS files for lakes
 
   gnss_nc=nc_open(paste0(gnss_drift_data_directory,log_file,'.nc'))
@@ -69,7 +84,7 @@ if (nrow(Info_df)>0){
     return(NA)
   }
   
-  plot(gnss_log$gnss_time_UTC,gnss_log$gnss_wse)
+  # plot(gnss_log$gnss_time_UTC,gnss_log$gnss_wse)
   
   nc_close(gnss_nc)
   

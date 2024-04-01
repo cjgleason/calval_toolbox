@@ -283,7 +283,7 @@ calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river
 
 
     
-      drift_in=read.csv(drift_file,header=TRUE,stringsAsFactors = FALSE)%>%
+    drift_in=read.csv(drift_file,header=TRUE,stringsAsFactors = FALSE)%>%
     filter(!is.na(gnss_Lon))%>%
     filter(!is.na(gnss_Lat))%>%
     mutate(UTM_x=LongLatToUTM(gnss_Lon,gnss_Lat,zone)[,1])%>%
@@ -294,11 +294,20 @@ calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river
     
     
     reach_id_filtered= filter(spatial_reach,reach_id==reach_id_search)
- 
     
     spatial_drift=st_as_sf(drift_in,coords=c('UTM_x','UTM_y'),crs=paste0('+proj=utm +zone=',zone,' +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs') ) 
     points_in_reach=st_intersection(spatial_drift,reach_id_filtered)
-    
+
+      ### Create Drift Stories for diff of diffs ###
+#     drift_story = data.frame(reach_id= points_in_reach$reach_id,
+#                              reach_wse_m = points_in_reach$gnss_wse,
+#                              wse_time_in_reach = points_in_reach$gnss_time_UTC,
+#                              gnss_uncertainty = points_in_reach$gnss_uncertainty_m,
+#                              drift_id=points_in_reach$drift_id)
+                      
+#  drift_story_name= paste0('nas/cee-water/cjgleason/calval/Processed data/Drift_stories',rivername,'_',reach_id_filtered$reach_id,'_drift_story.csv')
+#  write.table(drift_story,drift_story_name,sep=",", append=TRUE , row.names=FALSE, col.names=!file.exists(drift_story_name))
+      
     if (nrow(  points_in_reach)==0){
       
    
@@ -375,7 +384,7 @@ calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river
   slope_start_total_error= mean(drift_in[slope_start_index,]$gnss_uncertainty_m)
   slope_end_total_error= mean(drift_in[slope_end_index,]$gnss_uncertainty_m)
   
-      #this convention results in a negative slope, so swithing the start and end here to make a positive number
+      #this convention results in a negative slope, so switching the start and end here to make a positive number
   slope_m_m= (mean(slope_end_elevations)- mean(slope_start_elevations)) / cl_distance
   slope_total_error_m_m= (sqrt(sd(slope_start_elevations)^2+sd(slope_end_elevations)^2 +   slope_start_total_error ^2   +   slope_end_total_error ^2 )) / cl_distance
 
@@ -503,7 +512,8 @@ reach_stats=do.call(rbind,lapply(drifts,calc_reach_stats,spatial_reach=spatial_r
 write.csv(node_geom,paste0(output_directory,'/node/',rivername,'_drift_node_geom.csv'),append=FALSE,row.names=FALSE)
 write.csv(reach_geom,paste0(output_directory,'/reach/',rivername,'_drift_reach_geom.csv'),append=FALSE,row.names=FALSE)
 write.csv(node_wses,paste0(output_directory,'/node/',rivername,'_drift_node_wses.csv'),append=FALSE,row.names=FALSE)
-write.csv(reach_stats,paste0(output_directory,'/reach/',rivername,'_drift_reach_wse_slope.csv'),append=FALSE,row.names=FALSE)} else {
+write.csv(reach_stats,paste0(output_directory,'/reach/',rivername,'_drift_reach_wse_slope.csv'),append=FALSE,row.names=FALSE)
+} else {
         
 write.table(node_geom,paste0(output_directory,'/node/',rivername,'_drift_node_geom.csv'),append=TRUE,row.names=FALSE, sep=',')
 write.table(reach_geom,paste0(output_directory,'/reach/',rivername,'_drift_reach_geom.csv'),append=TRUE,row.names=FALSE, sep=',')

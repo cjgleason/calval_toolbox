@@ -17,7 +17,7 @@ calculate_slope_wse_fromPT_flybys=function(keyfile,pt_files,SWORD_path,SWORD_rea
 # PT_data_directory=paste0('/nas/cee-water/cjgleason/calval/Processed data/UMass/Flyby PT/reprocessed_2024_02_01/')
 # 
 # 
-# #
+# # 
 #   read_keys=function(keyfile){
 #     key_col_names = c("PT_Serial", "Label", "Baro_Comp", "Node_ID", "Reach_ID", "US_Reach_ID",
 #                       "DS_Reach_ID", "Lat_WGS84", "Long_WGS84", "Install_method",
@@ -42,7 +42,7 @@ calculate_slope_wse_fromPT_flybys=function(keyfile,pt_files,SWORD_path,SWORD_rea
 #   crossstream_error=0.05
 #   measurement_error=0.05
 #   output_directory='/nas/cee-water/cjgleason/calval/Processed data/UMass/Data frames/reprocessed_2024_02_01/'
-
+# 
 
   #caclulate SWORD products from PTs
   library(ncdf4)
@@ -170,10 +170,10 @@ calculate_slope_wse_fromPT_flybys=function(keyfile,pt_files,SWORD_path,SWORD_rea
   read_in_pt_slope=function(pt_file,slope_key){
     data_in= read.csv(pt_file,header=TRUE)%>%
       mutate(PT_Serial=pt_serial,
-             pt_id=paste0(pt_serial,'_',Node_ID))
+             pt_id=paste(pt_serial,'_',Node_ID))
     slope_key=slope_key%>%
-      mutate(pt_serial_key=pt_serial)%>%
-      right_join(data_in,by='pt_id')
+      # left_join(data_in,by='pt_serial')
+      left_join(data_in,by='pt_id')
   }
   
   #get all pt data at 15min for only those PTs called out as on a reach boundary in the key file
@@ -185,7 +185,7 @@ calculate_slope_wse_fromPT_flybys=function(keyfile,pt_files,SWORD_path,SWORD_rea
               # also, we want to account for the difference in US PTs, but since there are theoretically only 2, sd has no meaning
               total_error_pt_wse_us_boundary=sqrt( (max(mean_pt_wse_us_boundary_m)- min(mean_pt_wse_us_boundary_m))^2 +
                                                      sum( mean(pt_with_correction_total_error_m)^2)     )  ,
-              pt_serials_us=str_flatten(unique(pt_id),collapse="_"),
+              pt_serials_us=str_flatten(unique(pt_serial),collapse="_"),
               flag_us=str_flatten(unique(flag),collapse="_"))%>%
     mutate(reach_id=us_reach_id)
   #the above dataframe has wses for only reachids identified as an upstream boundary in the keyfile. We preserve that as a static 'reachid' so we can later merge it with the downstream ids to generate slope.
@@ -200,7 +200,7 @@ calculate_slope_wse_fromPT_flybys=function(keyfile,pt_files,SWORD_path,SWORD_rea
      dplyr::summarize(mean_pt_wse_ds_boundary_m=mean(pt_with_flyby_wse_m),
               total_error_pt_wse_ds_boundary=sqrt( (max(mean_pt_wse_ds_boundary_m)- min(mean_pt_wse_ds_boundary_m))^2 +
                                                      sum( mean(pt_with_correction_total_error_m)^2)),
-              pt_serials_ds=str_flatten(unique(pt_id),collapse="_"),
+              pt_serials_ds=str_flatten(unique(pt_serial),collapse="_"),
               flag_ds=str_flatten(unique(flag),collapse="_"))%>%
     mutate(reach_id=ds_reach_id)
 
@@ -218,7 +218,7 @@ calculate_slope_wse_fromPT_flybys=function(keyfile,pt_files,SWORD_path,SWORD_rea
     group_by(reach_id,pt_time_UTC)%>%
     
     #calcualte slope
-    mutate(slope_m_m= (mean_pt_wse_us_boundary_m- mean_pt_wse_ds_boundary_m)/reach_length)%>%
+    mutate(slope_m_m= (mean_pt_wse_ds_boundary_m- mean_pt_wse_us_boundary_m)/reach_length)%>%
     
     #calculate slope uncertainty
     mutate(slope_uncertainty_m_m = sqrt( total_error_pt_wse_us_boundary^2 +  total_error_pt_wse_ds_boundary^2  ) / reach_length )%>%

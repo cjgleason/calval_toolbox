@@ -55,7 +55,7 @@ select_appropriate_drift=function(passname,time_threshold_sec,wse_threshold_m,di
     
 #FIRST CHECK- if time matches, use the time matched dirft
   #read in node levels from drift
-  drift_node_index=which(!is.na(str_match(list.files(drift_node_directory),'drift_node_wse')))
+  drift_node_index=which(!is.na(str_match(list.files(drift_node_directory),paste0(rivername,'_drift_node_wse'))))
   drift_node_file=list.files(drift_node_directory,full.names=TRUE)[drift_node_index]
 
   
@@ -88,17 +88,17 @@ select_appropriate_drift=function(passname,time_threshold_sec,wse_threshold_m,di
   indirect_drift= drift_nodes[remove_index,]%>%
     mutate(wse=mean_node_drift_wse_m)
     
-
-   
   #get the 1hz data for those left behind
   drift_1hz=do.call(rbind,lapply(unique(indirect_drift$drift_id) ,read.csv))%>%
     mutate(gnss_time_UTC=as.numeric(as.POSIXct(gnss_time_UTC)))%>%
     # mutate(gnss_time_UTC=as.numeric(as.POSIXct(gnss_time_UTC,format= "%Y-%m-%d %H:%M:%S")))%>%#csv read scrubs date
     mutate(Lon=gnss_Lon,Lat=gnss_Lat)
-    
   
   #pull pt levels at swot time-----------
-  pt_at_swot_time= do.call(rbind,lapply(list.files(flyby_pt_directory,full.names=TRUE), read.csv))%>%
+  pt_index=which(!is.na(str_match(list.files(flyby_pt_directory),paste0('_',rivername,'_'))))
+  pt_file=list.files(flyby_pt_directory,full.names=TRUE)[pt_index]
+ 
+  pt_at_swot_time= do.call(rbind,lapply(pt_file, read.csv))%>%
     mutate(pt_time_UTC=as.numeric(as.POSIXct(pt_time_UTC)))%>%#csv read strips the datetime
     mutate(node_id=Node_ID)%>%
     group_by(node_id)%>%

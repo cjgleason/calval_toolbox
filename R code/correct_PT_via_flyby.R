@@ -1,7 +1,7 @@
 Sys.umask('002')
 #dank flyby script
 correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directory,
-                              gnss_sd_thresh,time_thresh,dist_thresh,output_dir){
+                              gnss_sd_thresh,time_thresh,dist_thresh,output_dir,rivername){
   
   if (file.exists(paste0('/nas/cee-water/cjgleason/calval/Processed data/PT_stories/','flyby_',pt_file_in))){
     file.remove(paste0('/nas/cee-water/cjgleason/calval/Processed data/PT_stories/','flyby_',pt_file_in))}
@@ -27,6 +27,7 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
   #if flag === 0,1, were good, do nothing
   #if flag === else, we need to do stuff
   flag=read.csv(paste0(munged_PT_directory,pt_file_in), header = TRUE, nrow = 1)$flag
+ 
   # stop here if flag is 0, the file is good, or if flag =1,
   #the file has only a shift in the raw record
   pt_data=read.csv(paste0(munged_PT_directory,pt_file_in), header = TRUE, stringsAsFactors = FALSE)%>%

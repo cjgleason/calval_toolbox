@@ -168,6 +168,31 @@ source('/nas/cee-water/cjgleason/calval_toolbox/R code/create_GNSS_dataframe.R')
 raw_GNSS=sub( "\\..*","", list.files(GNSS_drift_data_directory,recursive=TRUE))
 raw_GNSS_river=which(!is.na(do.call(rbind,lapply(raw_GNSS,str_match,rivername))))
 raw_GNSS=raw_GNSS[raw_GNSS_river]
+ #there are 'bad' files within the GNSS xml folders that we do not want to bring in, so filter by version date.
+  # positions 6 and 7 are the start and end of the data
+  # position 8 is the repro date- we want the most recent repro
+  parse_gnss=function(gnss_file){
+    splitter= strsplit(gnss_file,'_')
+    first_two_dates=paste(splitter[[1]][6],splitter[[1]][7],sep="_")
+    
+    #the standard date format has an 'nT' character in the middle of thedates
+    third_date=as.POSIXct(paste0(substring(splitter[[1]][8],1,8),
+                                 substring(splitter[[1]][8],10,15) ),
+                          format='%Y%m%d%H%M%S')
+    # tp=splitter[[1]][[12]]
+    return(data.frame(cbind(keystring=paste(first_two_dates),third_date)))
+  }
+  
+gnss_index=do.call(rbind,lapply(raw_GNSS,parse_gnss))%>%
+    #this is implicit, so when we filter things we'll mess up the order. 
+    #add an index favlue
+    mutate(gnss_file_index=1:nrow(.))%>%
+    group_by(keystring)%>%
+    filter(third_date==max(third_date))
+  
+ 
+  #remove old files
+raw_GNSS=raw_GNSS[gnss_index$gnss_file_index]
 
 #pull filename before the second _
 QA_QC_drifts=sub( "\\..*","",list.files(QA_QC_drift_output_directory))
@@ -222,11 +247,38 @@ dry_threshold = 0.10 #This is a raw pt level where anything below is considered 
 munged_files= list.files(PT_data_directory,
                          recursive= TRUE)
     
-PT_index=which(!is.na(do.call(rbind,lapply(munged_files,str_match,'PT_L1'))))
-PT_files=munged_files[PT_index]
+PT_files=munged_files[grepl(paste0("_", rivername, "_PT_L1"), munged_files)]
+# PT_index=which(!is.na(do.call(rbind,lapply(munged_files,str_match,'PT_L1'))))
+# PT_files=munged_files[PT_index]
 csv_index=which(!is.na(do.call(rbind,lapply(PT_files,str_match,'.csv'))))
 raw_PT_files=PT_files[csv_index]
+raw_PT_files=raw_PT_files
 
+ #there are 'bad' files within the PT xml folders that we do not want to bring in, so filter by version date.
+  # positions 8 and 9 are the start and end of the data
+  # position 10 is the repro date- we want the most recent repro
+  parse_pt=function(pt_file){
+    # sans_csv = sub('\\.csv$', '',pt_file)
+    splitter= strsplit(pt_file,'_')
+    first_two_dates=paste(splitter[[1]][8],splitter[[1]][9],sep="_")
+    #the standard date format has an 'nT' character in the middle of thedates
+    third_date=as.POSIXct(paste0(substring(splitter[[1]][10],1,8),
+                                 substring(splitter[[1]][10],10,15) ),
+                          format='%Y%m%d%H%M%S')
+    # tp=splitter[[1]][[12]]
+    return(data.frame(cbind(keystring=paste0(splitter[[1]][7],'_',first_two_dates),third_date)))
+  }
+  
+  pt_index=do.call(rbind,lapply(raw_PT_files,parse_pt))%>%
+    #this is implicit, so when we filter things we'll mess up the order. 
+    #add an index favlue
+    mutate(pt_file_index=1:nrow(.))%>%
+    group_by(keystring)%>%
+    filter(third_date==max(third_date))
+  
+ 
+  #remove old files
+  raw_PT_files=raw_PT_files[pt_index$pt_file_index]
 #open the key files   - Taylor added column labels and way to handle blank cells to make as NA
 
 read_keys=function(keyfile){
