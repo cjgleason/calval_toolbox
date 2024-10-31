@@ -2,21 +2,37 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
   library(ncdf4)
   library(stringr)
   library(dplyr)
-  
+  # 
   # hubname='UNC'
   # rivername='YR'
   # continent='na'
   # utm_zone=6
   # PT_key_file='SWOTCalVal_YR_KEY_20230521_20230923.csv'
-  # 
-  # 
-  #   gnss_drift_data_directory=paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/From Andy/UNC_netCDFs/')
-  #   output_directory=paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Munged drifts/')
-  #   naughty_bin_directory=paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Flagged drifts/')
-  #   log_file = list.files(gnss_drift_data_directory)
-  #   log_file = log_file[grep("_YR_",log_file)][2]
-  #   gnss_nc=nc_open(paste0(gnss_drift_data_directory,log_file))
-    
+  # hubname='Brown'
+  # rivername='NS'
+  # continent='na'
+  # PT_key_file= c('SWOTCalVal_NS_KEY_20230525_20230613.csv',
+  #               'SWOTCalVal_NS_KEY_20230613_20230725.csv',
+  #               'SWOTCalVal_NS_KEY_20230725_20230928.csv')
+  # #WM
+  # # utm_zone=13 #NS= 13
+  #
+  # hubname='UMass'
+  # rivername='CR'
+  # continent='na'
+  # PT_key_file=c('SWOTCalVal_CR_KEY_20230322_20230614.csv',
+  #               'SWOTCalVal_CR_KEY_20230516_20230613.csv',
+  #               'SWOTCalVal_CR_KEY_20230613_20231128.csv',
+  #               'SWOTCalVal_CR_KEY_20231116_20240509.csv') #CT
+  # utm_zone=18 #Ct= 18
+  #
+    # gnss_drift_data_directory=paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/From Andy/',hubname,'_netCDFs/')
+    # output_directory=paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Munged drifts/')
+    # naughty_bin_directory=paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Flagged drifts/')
+    # log_file = list.files(gnss_drift_data_directory)
+    # log_file = log_file[grep("_YR_",log_file)][3]
+    # gnss_nc=nc_open(paste0(gnss_drift_data_directory,log_file))
+
     #this takes correcte GNSS and writes it to file, applying our cleanup QA QC
   
 # print(naughty_bin_directory)
@@ -79,8 +95,12 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
     filter(gnss_uncertainty_m<0.05)%>%
     mutate(drift_id= sub('',"",log_file))
  
- if (rivername =='NS') {
-     if (!grepl("FINN|POE|REC1_20230928",log_file)){
+ if (!any(rivername %in% c('NS','WK'))){
+   gnss_log=gnss_log%>%
+     filter(gnss_surf_flag==12)%>%
+     filter(gnss_motion_flag==2)
+ }else{
+     if (rivername == 'NS' & !grepl("FINN|POE|REC1_20230928",log_file)){
          gnss_log=gnss_log%>%
          filter(gnss_surf_flag==12)%>%
          filter(gnss_motion_flag==2)
@@ -90,39 +110,39 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
  }
 
 #waimak is special
-    if (rivername =='WK'){
-        
-        #check to see if this is a PT install file
-        #if so, it will be in the key
-        #in that case, we need to include the motion code of 0
-    installfile=keyfile$Final_Install_Log_File
-    takeoutfile= keyfile$Final_Uninstall_Log_File
-    filenames=c(installfile,takeoutfile)
-        
-#         print('in keyfile')
-       # print(filenames)
-#         print('from raw GNSS')
-#         print(log_file)
-  
-#          print('detector')
-#         print(str_replace(log_file,"L2",'L0'))
-#         print(any(str_detect(filenames,str_replace(log_file,"L2",'L0')),na.rm=TRUE))
-   
-       
-    if(any(str_detect(str_replace(log_file,"L2",'L0'),filenames),na.rm=TRUE)){
-        
-       #this means the fileis in the key, and is a PT occupy. We therefore need a '0' motion code in this case.
-        
-  gnss_log=data.frame(gnss_Lat=Lat,gnss_Lon=Lon,gnss_wse=gnss_wse,gnss_time_tai=gnss_time_tai,gnss_uncertainty_m=gnss_uncertainty,
-                      gnss_surf_flag=gnss_surf_flag,gnss_motion_flag=gnss_motion_flag, height_above_ellipsoid= height_above_ellipsoid)%>%
-    #R's native POSIXCT also doesn't have leap seconds, so we're good
-    mutate(gnss_time_UTC = as.POSIXct(gnss_time_tai-37,origin='2000-01-01 00:00:00',tz='UTC' ))%>% # +37 because netcdf states a 37 second difference between TAI and UTC. only apply this here
-    mutate(gnss_ellipsoid=gnss_ellipsoid)%>%
-    #filter for self ID uncertainty at 5cm
-    filter(gnss_uncertainty_m<0.05)%>%
-    mutate(drift_id= sub('',"",log_file))
-            }
-        }
+#     if (rivername =='WK'){
+#         
+#         #check to see if this is a PT install file
+#         #if so, it will be in the key
+#         #in that case, we need to include the motion code of 0
+#     installfile=keyfile$Final_Install_Log_File
+#     takeoutfile= keyfile$Final_Uninstall_Log_File
+#     filenames=c(installfile,takeoutfile)
+#         
+# #         print('in keyfile')
+#        # print(filenames)
+# #         print('from raw GNSS')
+# #         print(log_file)
+#   
+# #          print('detector')
+# #         print(str_replace(log_file,"L2",'L0'))
+# #         print(any(str_detect(filenames,str_replace(log_file,"L2",'L0')),na.rm=TRUE))
+#    
+#        
+#     if(any(str_detect(str_replace(log_file,"L2",'L0'),filenames),na.rm=TRUE)){
+#         
+#        #this means the fileis in the key, and is a PT occupy. We therefore need a '0' motion code in this case.
+#         
+#   gnss_log=data.frame(gnss_Lat=Lat,gnss_Lon=Lon,gnss_wse=gnss_wse,gnss_time_tai=gnss_time_tai,gnss_uncertainty_m=gnss_uncertainty,
+#                       gnss_surf_flag=gnss_surf_flag,gnss_motion_flag=gnss_motion_flag, height_above_ellipsoid= height_above_ellipsoid)%>%
+#     #R's native POSIXCT also doesn't have leap seconds, so we're good
+#     mutate(gnss_time_UTC = as.POSIXct(gnss_time_tai-37,origin='2000-01-01 00:00:00',tz='UTC' ))%>% # +37 because netcdf states a 37 second difference between TAI and UTC. only apply this here
+#     mutate(gnss_ellipsoid=gnss_ellipsoid)%>%
+#     #filter for self ID uncertainty at 5cm
+#     filter(gnss_uncertainty_m<0.05)%>%
+#     mutate(drift_id= sub('',"",log_file))
+#             }
+#         }
 
  #at this point, we have two pieces of info- turning points that need to be borken ito separate drifts, and events we need to filter out
     #let's make two info_dfs

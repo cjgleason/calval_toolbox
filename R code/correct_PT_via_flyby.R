@@ -7,15 +7,15 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
     file.remove(paste0('/nas/cee-water/cjgleason/calval/Processed data/PT_stories/','flyby_',pt_file_in))}
   
   
-  
   # 
-  # munged_PT_directory= '/nas/cee-water/cjgleason/calval/Processed data/UMass/Munged PT/reprocessed_2023_12_20/'
-  # pt_file_in=list.files(munged_PT_directory)[68]
-  # munged_GNSS_directory='/nas/cee-water/cjgleason/calval/Processed data/UMass/Munged drifts/reprocessed_2023_12_20/'
+  # 
+  # munged_PT_directory= '/nas/cee-water/cjgleason/calval/Processed data/UMass/Munged PT/reprocessed_2024_04_24/'
+  # pt_file_in=list.files(munged_PT_directory)[1]
+  # munged_GNSS_directory='/nas/cee-water/cjgleason/calval/Processed data/UMass/Munged drifts/reprocessed_2024_04_24/'
   # gnss_sd_thresh=0.05
   # time_thresh=7.5*60
   # dist_thresh=200
-  
+
   
   library(dplyr)
   library(parallel)
@@ -41,6 +41,7 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
              flyby_total_error_m=NA,
              pt_with_correction_mean_offset_sd_m=pt_correction_offset_sd_m_install,
              pt_with_correction_total_error_m=pt_correction_mean_total_error_m,
+             flyby_minus_install_m=NA,
              pt_with_flyby_wse_m=pt_wse_m,
              flag=new_flag)
     
@@ -209,6 +210,7 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
              flyby_total_error_m=NA,
              pt_with_correction_mean_offset_sd_m=pt_correction_offset_sd_m_install,
              pt_with_correction_total_error_m=pt_correction_mean_total_error_m,
+             flyby_minus_install_m=NA,
              pt_with_flyby_wse_m=pt_wse_m,
              flag=new_flag)
     
@@ -227,6 +229,7 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
              flyby_total_error_m=NA,
              pt_with_correction_mean_offset_sd_m=pt_correction_offset_sd_m_install,
              pt_with_correction_total_error_m=pt_correction_mean_total_error_m,
+             flyby_minus_install_m=NA,
              pt_with_flyby_wse_m=pt_wse_m,
              flag=new_flag)
     write.csv(pt_data_out,paste0(output_dir,'flyby_',pt_file_in),row.names = FALSE)
@@ -236,13 +239,13 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
   
   
   # plot(as.POSIXct(flyby_offsets$pt_time_UTC),flyby_offsets$flyby_pt_correction_m)
-  print(paste('flag is',pt_data$flag[1]))
-  print(paste('install offset is',pt_data$pt_correction_m_install[1]))
-  print(paste('uninstall offset is',pt_data$pt_correction_m_uninstall[1]))
-  print(paste('min of flyby offsets is ',min(flyby_offsets$flyby_pt_correction_m)))
-  print(paste('max of flyby offsets is ',max(flyby_offsets$flyby_pt_correction_m)))
-  print(paste('number of flyby offsets is', nrow(flyby_offsets)))
-  
+  # print(paste('flag is',pt_data$flag[1]))
+  # print(paste('install offset is',pt_data$pt_correction_m_install[1]))
+  # print(paste('uninstall offset is',pt_data$pt_correction_m_uninstall[1]))
+  # print(paste('min of flyby offsets is ',min(flyby_offsets$flyby_pt_correction_m)))
+  # print(paste('max of flyby offsets is ',max(flyby_offsets$flyby_pt_correction_m)))
+  # print(paste('number of flyby offsets is', nrow(flyby_offsets)))
+  # 
   #parse flags--------
   #if flag is 10, there was an install only
   #do the grouped offsets agree with the install?
@@ -277,6 +280,7 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
                  flyby_total_error_m=NA,
                  pt_with_correction_mean_offset_sd_m=pt_correction_offset_sd_m_install,
                  pt_with_correction_total_error_m=pt_correction_mean_total_error_m,
+                 flyby_minus_install_m=NA,
                  pt_with_flyby_wse_m=pt_wse_m,
                  flag=new_flag)
         
@@ -289,6 +293,7 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
                  flyby_total_error_m=NA,
                  pt_with_correction_mean_offset_sd_m=pt_correction_offset_sd_m_install,
                  pt_with_correction_total_error_m=pt_correction_mean_total_error_m,
+                 flyby_minus_install_m=NA,
                  pt_with_flyby_wse_m=pt_wse_m,
                  flag=new_flag)
         # 
@@ -305,17 +310,32 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
       
       flyby_correction=mean(c(mean_flyby,install_mean))
       flyby_correction_sd=sd(c(mean_flyby,install_mean))
+      flyby_minus_install_m=abs(mean_flyby-install_mean)
       
       flyby_total=(sum(flyby_offsets$flyby_pt_correction_total_error_m)/nrow(flyby_offsets))
       
-      pt_data_out=pt_data%>%
-        mutate(flyby_correction_m= flyby_correction,
-               #                               #error from each   +     error in summarizing across offsets
-               flyby_total_error_m=sqrt(         (flyby_total)^2  + flyby_correction_sd^2 ),
-               pt_with_correction_mean_offset_sd_m=flyby_correction_sd,
-               pt_with_correction_total_error_m=flyby_total,
-               pt_with_flyby_wse_m=pt_level+flyby_correction,
-               flag=new_flag)
+      if (flyby_minus_install_m<=0.15){#new flag
+        pt_data_out=pt_data%>%
+          mutate(flyby_correction_m= flyby_correction,
+                 #                               #error from each   +     error in summarizing across offsets
+                 flyby_total_error_m=sqrt(         (flyby_total)^2  + flyby_correction_sd^2 ),
+                 pt_with_correction_mean_offset_sd_m=flyby_correction_sd,
+                 pt_with_correction_total_error_m=flyby_total,
+                 flyby_minus_install_m=flyby_minus_install_m,
+                 pt_with_flyby_wse_m=pt_level+flyby_correction,
+                 flag=new_flag+100000000-10000)
+      }else{
+        pt_data_out=pt_data%>%
+          mutate(flyby_correction_m= flyby_correction,
+                 #                               #error from each   +     error in summarizing across offsets
+                 flyby_total_error_m=sqrt(         (flyby_total)^2  + flyby_correction_sd^2 ),
+                 pt_with_correction_mean_offset_sd_m=flyby_correction_sd,
+                 pt_with_correction_total_error_m=flyby_total,
+                 flyby_minus_install_m=flyby_minus_install_m,
+                 pt_with_flyby_wse_m=pt_level+flyby_correction,
+                 flag=new_flag)
+      }
+     
       # write.csv(pt_data_out,paste0(output_dir,'flyby_',pt_file_in),row.names = FALSE)
       # return(NA)
       
@@ -343,6 +363,7 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
                  flyby_total_error_m=NA,
                  pt_with_correction_mean_offset_sd_m=pt_correction_offset_sd_m_install,
                  pt_with_correction_total_error_m=pt_correction_mean_total_error_m,
+                 flyby_minus_install_m=NA,
                  pt_with_flyby_wse_m=pt_wse_m,
                  flag=new_flag)
         
@@ -399,6 +420,7 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
               mutate(flyby_total_error_m=sqrt( (flyby_total)^2 + residual_sigma^2),
                      pt_with_correction_mean_offset_sd_m=NA,
                      pt_with_correction_total_error_m=flyby_total_error_m,
+                     flyby_minus_install_m=NA,
                      pt_with_flyby_wse_m=pt_level+flyby_correction_m,
                      flag=new_flag)
             # write.csv(pt_data_out,paste0(output_dir,'flyby_',pt_file_in),row.names = FALSE)
@@ -414,17 +436,32 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
             
             flyby_correction=mean(c(mean_flyby,install_mean,uninstall_mean))
             flyby_correction_sd=sd(c(mean_flyby,install_mean,uninstall_mean))
+            flyby_minus_install_m=abs(mean_flyby-mean(c(install_mean,uninstall_mean))) 
             
             flyby_total=(sum(flyby_offsets$flyby_pt_correction_total_error_m)/nrow(flyby_offsets))
             
-            pt_data_out=pt_data%>%
-              mutate(flyby_correction_m= flyby_correction,
-                     ##error from each              +     error in summarizing across offsets
-                     flyby_total_error_m=sqrt(         (flyby_total)^2  + flyby_correction_sd^2 ),
-                     pt_with_correction_mean_offset_sd_m=flyby_correction_sd,
-                     pt_with_correction_total_error_m=flyby_total,
-                     pt_with_flyby_wse_m=pt_level+flyby_correction,
-                     flag=new_flag)
+            if (flyby_minus_install_m<=0.15){#new flag - add negative!!
+              pt_data_out=pt_data%>%
+                mutate(flyby_correction_m= flyby_correction,
+                       ##error from each              +     error in summarizing across offsets
+                       flyby_total_error_m=sqrt(         (flyby_total)^2  + flyby_correction_sd^2 ),
+                       pt_with_correction_mean_offset_sd_m=flyby_correction_sd,
+                       pt_with_correction_total_error_m=flyby_total,
+                       flyby_minus_install_m=flyby_minus_install_m,
+                       pt_with_flyby_wse_m=pt_level+flyby_correction,
+                       flag=new_flag+100000000-10000)
+            }else{
+              pt_data_out=pt_data%>%
+                mutate(flyby_correction_m= flyby_correction,
+                       ##error from each              +     error in summarizing across offsets
+                       flyby_total_error_m=sqrt(         (flyby_total)^2  + flyby_correction_sd^2 ),
+                       pt_with_correction_mean_offset_sd_m=flyby_correction_sd,
+                       pt_with_correction_total_error_m=flyby_total,
+                       flyby_minus_install_m=flyby_minus_install_m,
+                       pt_with_flyby_wse_m=pt_level+flyby_correction,
+                       flag=new_flag)
+              }
+           
             # write.csv(pt_data_out,paste0(output_dir,'flyby_',pt_file_in),row.names = FALSE)
             # return(NA)
           } # end of the settlign check
@@ -437,6 +474,7 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
                    flyby_total_error_m=NA,
                    pt_with_correction_mean_offset_sd_m=pt_correction_offset_sd_m_install,
                    pt_with_correction_total_error_m=pt_correction_mean_total_error_m,
+                   flyby_minus_install_m=NA,
                    pt_with_flyby_wse_m=pt_wse_m,
                    flag=new_flag)
           
@@ -455,17 +493,33 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
       
       flyby_correction=mean(c(mean_flyby,install_mean))
       flyby_correction_sd=sd(c(mean_flyby,install_mean))
+      flyby_minus_install_m=abs(mean_flyby-install_mean)
       
       flyby_total=(sum(flyby_offsets$flyby_pt_correction_total_error_m)/nrow(flyby_offsets))
       
-      pt_data_out=pt_data%>%
-        mutate(flyby_correction_m= flyby_correction,
-               #                               #error from each   +     error in summarizing across offsets
-               flyby_total_error_m=sqrt(         (flyby_total)^2  + flyby_correction_sd^2 ),
-               pt_with_correction_mean_offset_sd_m=flyby_correction_sd,
-               pt_with_correction_total_error_m=flyby_total,
-               pt_with_flyby_wse_m=pt_level+flyby_correction,
-               flag=new_flag) 
+      if (flyby_minus_install_m<=0.15){#new flag
+        pt_data_out=pt_data%>%
+          mutate(flyby_correction_m= flyby_correction,
+                 #                               #error from each   +     error in summarizing across offsets
+                 flyby_total_error_m=sqrt(         (flyby_total)^2  + flyby_correction_sd^2 ),
+                 pt_with_correction_mean_offset_sd_m=flyby_correction_sd,
+                 pt_with_correction_total_error_m=flyby_total,
+                 flyby_minus_install_m=flyby_minus_install_m, ### added 4/30
+                 pt_with_flyby_wse_m=pt_level+flyby_correction,
+                 flag=new_flag+100000000-10000) 
+      }else{#10000 flag stays
+        pt_data_out=pt_data%>%
+          mutate(flyby_correction_m= flyby_correction,
+                 #                               #error from each   +     error in summarizing across offsets
+                 flyby_total_error_m=sqrt(         (flyby_total)^2  + flyby_correction_sd^2 ),
+                 pt_with_correction_mean_offset_sd_m=flyby_correction_sd,
+                 pt_with_correction_total_error_m=flyby_total,
+                 flyby_minus_install_m=flyby_minus_install_m, ### added 4/30
+                 pt_with_flyby_wse_m=pt_level+flyby_correction,
+                 flag=new_flag) 
+      }
+      
+      
     }
   }
   
@@ -484,20 +538,22 @@ correct_PT_via_flyby=function(pt_file_in,munged_PT_directory,munged_GNSS_directo
 #100000- there are not enough flybys: not appropriate to do anything
 #1000000- pt is likely settling. Linear fit was applied.
 #10000000 - flybys agree with OG file. we did nothing
+#100000000 - Flybys don’t agree with the offset. All install, uninstall, flybys averaged 
+             #AND flyby_mean - install_mean <= 15 cm, suspect, but use. 
 
-# munged_PT_directory= '/nas/cee-water/cjgleason/calval/Processed data/Brown/Munged PT/reprocessed_2023_12_20/'
-# output_dir=          '/nas/cee-water/cjgleason/calval/Processed data/Brown/Flyby PT/reprocessed_2023_12_20/'
-# pt_file_in=list.files(munged_PT_directory)
-# munged_GNSS_directory='/nas/cee-water/cjgleason/calval/Processed data/Brown/Munged drifts/reprocessed_2023_12_20/'
-# gnss_sd_thresh=0.05
-# time_thresh=7.5*60
-# dist_thresh=200
-# 
-# 
-# lapply(pt_file_in,correct_PT_via_flyby,
-#        munged_GNSS_directory=munged_GNSS_directory,
-#        munged_PT_directory=munged_PT_directory,
-#        time_thresh=time_thresh,
-#        dist_thresh=dist_thresh,
-#        gnss_sd_thresh=gnss_sd_thresh,
-#        output_dir=output_dir)
+munged_PT_directory= '/nas/cee-water/cjgleason/calval/Processed data/UMass/Munged PT/reprocessed_2024_04_17/'
+output_dir=          '/nas/cee-water/cjgleason/calval/Processed data/UMass/Flyby PT/reprocessed_2024_04_17/'
+pt_file_in=list.files(munged_PT_directory)
+munged_GNSS_directory='/nas/cee-water/cjgleason/calval/Processed data/UMass/Munged drifts/reprocessed_2024_04_17/'
+gnss_sd_thresh=0.05
+time_thresh=7.5*60
+dist_thresh=200
+
+
+lapply(pt_file_in,correct_PT_via_flyby,
+       munged_GNSS_directory=munged_GNSS_directory,
+       munged_PT_directory=munged_PT_directory,
+       time_thresh=time_thresh,
+       dist_thresh=dist_thresh,
+       gnss_sd_thresh=gnss_sd_thresh,
+       output_dir=output_dir)

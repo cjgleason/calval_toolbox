@@ -11,22 +11,34 @@ library(ncdf4)
 library(lubridate)
 # 
 # # #
+  # 
+  # hubname='UMass'
+  # rivername='CR'
+  # continent='na'
+  # PT_key_file=c('SWOTCalVal_CR_KEY_20230322_20230614.csv',
+  #               'SWOTCalVal_CR_KEY_20230516_20230613.csv',
+  #               'SWOTCalVal_CR_KEY_20230613_20231128.csv',
+  #               'SWOTCalVal_CR_KEY_20231116_20240509.csv') #CT
+  # utm_zone=18 #Ct= 18
   
-# hubname='Brown'
-# rivername='NS'
+# hubname='UNC'
+# rivername='YR'
 # continent='na'
-# PT_key_file= c('SWOTCalVal_NS_KEY_20230525_20230613.csv',
-#                'SWOTCalVal_NS_KEY_20230613_20230725.csv',
-#                'SWOTCalVal_NS_KEY_20230725_20230928.csv')
-# #WM
-# utm_zone=13 #NS= 13
-# 
+# utm_zone=6
+# PT_key_file='SWOTCalVal_YR_KEY_20230521_20230923.csv'
+#   
+  # hubname='UNC'
+  # rivername='TN'
+  # continent='na'
+  # PT_key_file= 'SWOTCalVal_TN_KEY_20230717_20230825.csv' #TN
+  # utm_zone=6
+
 # setwd(paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/'))
 # working_dir=(paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/'))
 # domain_file=paste0(rivername,'_domain.csv')
 # paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/')
-# QA_QC_PT_output_directory=(paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Munged PT/reprocessed_2024_03_19/'))
-# flagged_pt_output_directory=(paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Flagged PT/reprocessed_2024_03_19/'))
+# QA_QC_PT_output_directory=(paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Munged PT/reprocessed_2024_05_13/'))
+# flagged_pt_output_directory=(paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Flagged PT/reprocessed_2024_05_13/'))
 # 
 # 
 # dist_thresh_offset=300 # 150m *Trying 300 for WM to rid of 118-120 from naughty bin\n",
@@ -47,25 +59,29 @@ library(lubridate)
 # 
 #   this_key= read.csv(keyfile,stringsAsFactors=FALSE, na.strings = c("","NA","na","NaN", " "))%>%
 #     mutate(keyid=keyfile)%>%
-#     mutate(pt_serial=as.integer(PT_Serial))
+#     # mutate(pt_serial=as.integer(PT_Serial))
+#     mutate(pt_serial=PT_Serial)
 # }
 # master_key= do.call(rbind,lapply(PT_key_file,read_keys))
 # 
 # pt_data_directory=paste0('/nas/cee-water/cjgleason/calval/xml_scripts/',hubname,'/Munged/')
 # 
-# raw_pt_file=list.files(pt_data_directory, pattern='.csv', recursive = TRUE)[118]
+# raw_pt_file=list.files(pt_data_directory, pattern='.csv', recursive = TRUE)[151]
 # 
-# gnss_drift_data_directory=paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Munged drifts/reprocessed_2024_03_19/')
-# # 
+# gnss_drift_data_directory=paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Munged drifts/reprocessed_2024_05_13/')
+# #
 
 #   ######## above here comment out ########
 #   
 #grab the serial number from the PT file itself. Standarized file
 pt_serial_file_init = read.table(paste0(pt_data_directory,raw_pt_file), header= FALSE, nrow=1)$V1
 if (grepl(",,,,NA|,NA,NA,NA,NA|,,,,",pt_serial_file_init)){
-  pt_serial_file=(as.integer(gsub(",*NA,*|,*", "",pt_serial_file_init)))
+  # pt_serial_file=(as.integer(gsub(",*NA,*|,*", "",pt_serial_file_init)))
+  pt_serial_file=gsub(",*NA,*|,*", "",pt_serial_file_init)
+
 }else{
-  pt_serial_file=as.integer(pt_serial_file_init)
+  # pt_serial_file=as.integer(pt_serial_file_init)
+  pt_serial_file=pt_serial_file_init
 }
 print(paste0(pt_data_directory,raw_pt_file))
 
@@ -74,7 +90,8 @@ print(paste0(pt_data_directory,raw_pt_file))
 keyfile=master_key%>%
   mutate('driftID_install'= sub("\\..*","",Final_Install_Log_File))%>%
   mutate('driftID_uninstall'= sub("\\..*","",Final_Uninstall_Log_File))%>%
-  mutate(pt_serial=as.integer(PT_Serial))
+  # mutate(pt_serial=as.integer(PT_Serial))
+ mutate(pt_serial=PT_Serial)
 #--------------------------------
 
 #check for a serial match-----------
@@ -84,7 +101,8 @@ if( pt_serial_file %in% keyfile$pt_serial == FALSE){return(NA)}
 #now get the PT data, standardized(ish) by Taylor--------
 tryCatch({
   pt_data=read.csv(paste0(pt_data_directory,raw_pt_file),skip=10,header=TRUE) %>%
-    mutate(pt_serial=as.integer(pt_serial_file)) 
+    # mutate(pt_serial=as.integer(pt_serial_file))
+    mutate(pt_serial=as.integer(pt_serial_file))
 },
 error=function(cond){return(NA)})
 
@@ -164,7 +182,7 @@ if (difftime(pt_data$datetime[2],pt_data$datetime[1],units="secs")<=60){
 pt_mintime=min(pt_data$datetime,na.rm=TRUE)
 pt_maxtime=max(pt_data$datetime,na.rm=TRUE)
 
-# Need n if statement here for when install or uninstall end is next day######
+#
 keyfile_check=filter(keyfile,pt_serial==pt_serial_file)%>%
   mutate(  pt_install_UTC=as.POSIXct(paste(Date_PT_Install,Time_PT_Install_UTC),format= "%m/%d/%Y %H:%M"),
            pt_uninstall_UTC=as.POSIXct(paste(Date_PT_Uninstall,Time_PT_Uninstall_UTC),format= "%m/%d/%Y %H:%M"),
@@ -347,7 +365,7 @@ get_all_gnss=function(log_df_row){
 
 #this should get all the GNSS files that match the first two dates of the GNSS
 #file ID in the key. It there are multiple dates, it will pull the most recent
-#if there are turning points, it will return all files. we want to tag those
+#if there are turning points, it will return all files. we want to tag thosept_data
 #with an install or uninstall id
 
 
@@ -454,9 +472,11 @@ offset_dataframe=offset_dataframe %>%
 
 #to do a t-test, we need a column for install and one for uninstall  
 if(length(unique(offset_dataframe$occupy_id))==2){
-  p_value=t.test(x=filter(offset_dataframe,occupy_id=='install')$offset, 
+  p_value=tryCatch({t.test(x=filter(offset_dataframe,occupy_id=='install')$offset, 
                  y=filter(offset_dataframe,occupy_id=='uninstall')$offset,
-                 alternative = "two.sided")$p.value
+                 alternative = "two.sided")$p.value}, 
+           error=function(cond){p_value=NA})
+                 
 }else{
   #install only
   p_value=NA

@@ -394,7 +394,6 @@ SWORD_reach= read.csv(domain_file)
 this_river_reach_IDs= as.numeric(unique(SWORD_reach$Reach_ID[!is.na(SWORD_reach$Reach_ID)]))
 this_river_node_IDs= as.numeric(unique(SWORD_reach$Node_ID[!is.na(SWORD_reach$Node_ID)]))
 
-
 source('/nas/cee-water/cjgleason/calval_toolbox/R code/calculate_slope_wse_fromdrift.R')
 
 
@@ -422,6 +421,8 @@ if (process_PTs==1){
     
     print('starting pt dataframe creation')
 PT_files=paste0(QA_QC_PT_flyby_output_directory,list.files(QA_QC_PT_flyby_output_directory))
+# This filters for only rivername PTs #    
+PT_files = PT_files[grepl(paste0("_", rivername, "_"), PT_files)]  
 SWORD_reach= read.csv(domain_file)
 this_river_reach_IDs= as.numeric(as.character(unique(SWORD_reach$Reach_ID)))
 this_river_node_IDs= as.numeric(unique(SWORD_reach$Node_ID[!is.na(SWORD_reach$Node_ID)]))
@@ -462,7 +463,7 @@ print('ending pt dataframe creation')
 #SWOT_L2_HR_RiverSP_<FileIdentifier>_<CycleID>_<PassID>_<ContinentID>_<RangeBeginningDateTime>_<RangeEndingDateTime>_<CRID>_<ProductCounter>.<extension> 
 
 if (process_PTs ==1){
-passfile=paste0('/nas/cee-water/cjgleason/calval/Processed data/riversp_list_clean_',rivername,'_20240201.txt')
+passfile=paste0('/nas/cee-water/cjgleason/calval/Processed data/riversp_list_clean_',rivername,'_20240423.txt')
 
  
 passnames=read.delim(passfile,header=F)$V1

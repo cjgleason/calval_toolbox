@@ -60,8 +60,8 @@ lake_PT=function(raw_pt_file,master_key,dist_thresh,time_thresh,pt_data_director
   # master_key= do.call(rbind,lapply(PT_key_file,read_keys))
   # 
   # raw_pt_file=csv_PT_files
-  # raw_pt_file = raw_pt_file[13]
-  
+  # raw_pt_file = raw_pt_file[36]
+  # 
   #grab the serial number from the PT file itself. Standarized file
   pt_serial_file=as.integer(substring(read.table(paste0(pt_data_directory,raw_pt_file), 
                                                  header = FALSE, nrow = 1)$V1,1,7))
@@ -122,8 +122,19 @@ print(pt_serial_file)
       mutate(datetime=as.POSIXct(paste(Date,Time),format="%m/%d/%Y %I:%M:%S %p"))
   } else { #24 hour time
     pt_data=pt_data%>%
-      mutate(datetime=as.POSIXct(paste(Date,Time),format= "%Y/%m/%d %H:%M:%S"))
+      mutate(datetime=as.POSIXct(paste(Date,Time),format= "%Y/%m/%d %H:%M:%S")) 
   }
+  
+  if (is.null(pt_data$datetime)|is.na(pt_data$datetime)[1]){
+    pt_data=pt_data%>%
+      mutate(Date=as.POSIXct(Date, format="%m/%d/%Y"))%>%
+      mutate(datetime=as.POSIXct(paste(Date,Time),format= "%Y-%m-%d %H:%M:%S"))#%>%
+  }else{print("Date is good")}
+  
+  if (year(pt_data$datetime[1])-2000 < 0){
+    pt_data=pt_data%>%
+      mutate(datetime=as.POSIXct(as.character(datetime),format="%y-%m-%d %H:%M:%S"))
+  }else{print("Date is in correct format")}
   #-----------------------------------
   
   # Check for non 15 minute data (1 minute now), but maybe could do anything less than 15? #
@@ -255,8 +266,12 @@ print(pt_serial_file)
   
   
   if (is.na(pt_data[1,]$Date_GNSS_Uninstall)){ #in the case where there is no uninstall
+    if (filename =='SWOTCalVal_YF_PT_L1_PT001_20230419T200000_20231012T160000_20240329T174535_'){
+      pt_data_for_offset =  pt_data%>% #get the raw data and filter it
+        filter(pt_time_UTC >= gnss_install_UTC_start[1] & pt_time_UTC <= ceiling_date(gnss_install_UTC_end[1], unit = "hour"))
+    }else{
     pt_data_for_offset =  pt_data%>% #get the raw data and filter it
-      filter(pt_time_UTC >= gnss_install_UTC_start[1] & pt_time_UTC <= gnss_install_UTC_end[1])
+      filter(pt_time_UTC >= gnss_install_UTC_start[1] & pt_time_UTC <= gnss_install_UTC_end[1])}
     
   }else{ #if we have both an install and an uninstall
     pt_data_for_offset =pt_data%>%
