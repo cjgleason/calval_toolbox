@@ -75,9 +75,13 @@ calculate_slope_wse_fromPT_flybys=function(keyfile,pt_files,SWORD_path,SWORD_rea
   # detach(package:'plyr')
   
   #read in key file and add unique id (pt_id) column to get at PT serial moving nodes in river
+  # key_df=keyfile%>%
+  #   transmute(pt_serial=as.integer(PT_Serial),pt_id = paste0(PT_Serial,'_',Node_ID),node_id=as.character(Node_ID),reach_id=as.character(Reach_ID),
+  #             us_reach_id=as.character(US_Reach_ID),ds_reach_id=as.character(DS_Reach_ID),keyid=keyid)%>%
+  #   filter(!is.na(pt_serial))
   key_df=keyfile%>%
-    transmute(pt_serial=as.integer(PT_Serial),pt_id = paste0(PT_Serial,'_',Node_ID),node_id=as.character(Node_ID),reach_id=as.character(Reach_ID),
-              us_reach_id=as.character(US_Reach_ID),ds_reach_id=as.character(DS_Reach_ID),keyid=keyid)%>%
+    transmute(pt_serial=as.integer(PT_Serial),pt_id = paste0(PT_Serial,'_',v17b_node_id),node_id=as.character(v17b_node_id),reach_id=as.character(v17b_reach_id),
+              us_reach_id=as.character(v17b_US_Reach_ID),ds_reach_id=as.character(v17b_DS_Reach_ID),keyid=keyid)%>%
     filter(!is.na(pt_serial))
   #read in SWORD
   

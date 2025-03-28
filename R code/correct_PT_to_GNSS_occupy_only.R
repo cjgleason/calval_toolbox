@@ -25,20 +25,21 @@ library(lubridate)
 # rivername='YR'
 # continent='na'
 # utm_zone=6
-# PT_key_file='SWOTCalVal_YR_KEY_20230521_20230923.csv'
-#   
-  # hubname='UNC'
-  # rivername='TN'
-  # continent='na'
-  # PT_key_file= 'SWOTCalVal_TN_KEY_20230717_20230825.csv' #TN
-  # utm_zone=6
-
+# PT_key_file= c('SWOTCalVal_YR_KEY_20230521_20230923_v17.csv',
+#                'SWOTCalVal_YR_KEY_20240704_20240826_v17.csv')
+# # #
+#   # hubname='UNC'
+#   # rivername='TN'
+#   # continent='na'
+#   # PT_key_file= 'SWOTCalVal_TN_KEY_20230717_20230825.csv' #TN
+#   # utm_zone=6
+# 
 # setwd(paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/'))
 # working_dir=(paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/'))
-# domain_file=paste0(rivername,'_domain.csv')
+# domain_file=paste0(rivername,'_domain_v17.csv')
 # paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/')
-# QA_QC_PT_output_directory=(paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Munged PT/reprocessed_2024_05_13/'))
-# flagged_pt_output_directory=(paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Flagged PT/reprocessed_2024_05_13/'))
+# QA_QC_PT_output_directory=(paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Munged PT/reprocessed_2025_01_13/'))
+# flagged_pt_output_directory=(paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Flagged PT/reprocessed_2025_01_13/'))
 # 
 # 
 # dist_thresh_offset=300 # 150m *Trying 300 for WM to rid of 118-120 from naughty bin\n",
@@ -66,10 +67,10 @@ library(lubridate)
 # 
 # pt_data_directory=paste0('/nas/cee-water/cjgleason/calval/xml_scripts/',hubname,'/Munged/')
 # 
-# raw_pt_file=list.files(pt_data_directory, pattern='.csv', recursive = TRUE)[151]
+# raw_pt_file=list.files(pt_data_directory, pattern='.csv', recursive = TRUE)[252]
 # 
-# gnss_drift_data_directory=paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Munged drifts/reprocessed_2024_05_13/')
-# #
+# gnss_drift_data_directory=paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Munged drifts/reprocessed_2025_01_13/')
+
 
 #   ######## above here comment out ########
 #   
@@ -246,7 +247,7 @@ pt_data=pt_data %>%
             pt_level=Level,temperature=Temperature,
             driftID_install=driftID_install,driftID_uninstall=driftID_uninstall,
             datetime=datetime,
-            keyid=keyid, Date_GNSS_Install=Date_GNSS_Install,Date_GNSS_Uninstall=Date_GNSS_Uninstall, Reach_ID=Reach_ID, Node_ID=Node_ID) %>%
+            keyid=keyid, Date_GNSS_Install=Date_GNSS_Install,Date_GNSS_Uninstall=Date_GNSS_Uninstall, Reach_ID=v17b_reach_id, Node_ID=v17b_node_id) %>%
   filter(pt_time_UTC >=pt_install_UTC  )%>%
   filter(pt_time_UTC <=pt_uninstall_UTC  )%>%
   filter(pt_level >= dry_threshold)# limit for dry here with a filter in this pipe - must check that dates are ok
@@ -300,7 +301,7 @@ if (is.na(pt_data[1,]$Date_GNSS_Uninstall)){ #in the case where there is no unin
 
 
 #we need to tag installs and uninstalls so we get the TPs right where we want to
-log_df=distinct(select(pt_data_for_offset,driftID_install,driftID_uninstall))%>%
+log_df=distinct(dplyr::select(pt_data_for_offset,driftID_install,driftID_uninstall))%>%
   gather(file_id,value)%>%
   filter(!is.na(value))
 

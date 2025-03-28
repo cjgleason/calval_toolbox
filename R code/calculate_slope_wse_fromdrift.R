@@ -169,7 +169,7 @@ calc_node_wse=function(drift_file,node_df,cl_df,zone,photo_path,scale_maxwidth){
   library(ncdf4)
   library(stringr)
     
-      ### Need to point to the drift files in function?? ###  
+      
    drift_in=read.csv(drift_file,header=TRUE,stringsAsFactors = FALSE)%>% 
     filter(!is.na(gnss_Lon))%>%
     filter(!is.na(gnss_Lat))%>%
@@ -299,14 +299,16 @@ calc_reach_stats=function(drift_file,spatial_reach, buffer,cl_df,zone,this_river
     points_in_reach=st_intersection(spatial_drift,reach_id_filtered)
 
       ### Create Drift Stories for diff of diffs ###
-#     drift_story = data.frame(reach_id= points_in_reach$reach_id,
-#                              reach_wse_m = points_in_reach$gnss_wse,
-#                              wse_time_in_reach = points_in_reach$gnss_time_UTC,
-#                              gnss_uncertainty = points_in_reach$gnss_uncertainty_m,
-#                              drift_id=points_in_reach$drift_id)
-                      
-#  drift_story_name= paste0('nas/cee-water/cjgleason/calval/Processed data/Drift_stories',rivername,'_',reach_id_filtered$reach_id,'_drift_story.csv')
-#  write.table(drift_story,drift_story_name,sep=",", append=TRUE , row.names=FALSE, col.names=!file.exists(drift_story_name))
+    drift_story = data.frame(reach_id= points_in_reach$reach_id,
+                               reach_wse_m = points_in_reach$gnss_wse,
+                               wse_time_in_reach = points_in_reach$gnss_time_UTC,
+                               gnss_uncertainty = points_in_reach$gnss_uncertainty_m,
+                               gnss_Lon = points_in_reach$gnss_Lon,
+                               gnss_Lat = points_in_reach$gnss_Lat,
+                               drift_id=points_in_reach$drift_id)
+   
+    drift_story_name= paste0('/nas/cee-water/cjgleason/calval/Processed data/Drift_stories/',rivername,'_',reach_id_filtered$reach_id,'_drift_story.csv')
+    write.table(drift_story,drift_story_name,sep=",", append=TRUE , row.names=FALSE, col.names=!file.exists(drift_story_name))
       
     if (nrow(  points_in_reach)==0){
       

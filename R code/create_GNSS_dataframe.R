@@ -8,30 +8,27 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
   # continent='na'
   # utm_zone=6
   # PT_key_file='SWOTCalVal_YR_KEY_20230521_20230923.csv'
-  # hubname='Brown'
-  # rivername='NS'
-  # continent='na'
-  # PT_key_file= c('SWOTCalVal_NS_KEY_20230525_20230613.csv',
-  #               'SWOTCalVal_NS_KEY_20230613_20230725.csv',
-  #               'SWOTCalVal_NS_KEY_20230725_20230928.csv')
-  # #WM
-  # # utm_zone=13 #NS= 13
-  #
-  # hubname='UMass'
-  # rivername='CR'
-  # continent='na'
-  # PT_key_file=c('SWOTCalVal_CR_KEY_20230322_20230614.csv',
-  #               'SWOTCalVal_CR_KEY_20230516_20230613.csv',
-  #               'SWOTCalVal_CR_KEY_20230613_20231128.csv',
-  #               'SWOTCalVal_CR_KEY_20231116_20240509.csv') #CT
-  # utm_zone=18 #Ct= 18
-  #
-    # gnss_drift_data_directory=paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/From Andy/',hubname,'_netCDFs/')
-    # output_directory=paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Munged drifts/')
-    # naughty_bin_directory=paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Flagged drifts/')
-    # log_file = list.files(gnss_drift_data_directory)
-    # log_file = log_file[grep("_YR_",log_file)][3]
-    # gnss_nc=nc_open(paste0(gnss_drift_data_directory,log_file))
+  
+  # hubname='CU'
+  # rivername='AR'
+  # continent='sa'
+  # utm_zone='20 +south'
+  # #
+  # # hubname='UMass'
+  # # rivername='CR'
+  # # continent='na'
+  # # PT_key_file=c('SWOTCalVal_CR_KEY_20230322_20230614.csv',
+  # #               'SWOTCalVal_CR_KEY_20230516_20230613.csv',
+  # #               'SWOTCalVal_CR_KEY_20230613_20231128.csv',
+  # #               'SWOTCalVal_CR_KEY_20231116_20240509.csv') #CT
+  # # utm_zone=18 #Ct= 18
+  # 
+  # gnss_drift_data_directory=paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/From Andy/',hubname,'_netCDFs/')
+  # output_directory=paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Munged drifts/')
+  # naughty_bin_directory=paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/Flagged drifts/')
+  # log_file = list.files(gnss_drift_data_directory)
+  # log_file = log_file[grep("_AR_",log_file)][1]
+  # gnss_nc=nc_open(paste0(gnss_drift_data_directory,log_file))
 
     #this takes correcte GNSS and writes it to file, applying our cleanup QA QC
   
@@ -94,8 +91,9 @@ create_gnss_dataframe= function(log_file,gnss_drift_data_directory,output_direct
     #filter for self ID uncertainty at 5cm
     filter(gnss_uncertainty_m<0.05)%>%
     mutate(drift_id= sub('',"",log_file))
- 
- if (!any(rivername %in% c('NS','WK'))){
+  
+###Must look at this for new NS data 1/8### 
+ if (!any(rivername %in% c('NS','WK', 'AR'))){
    gnss_log=gnss_log%>%
      filter(gnss_surf_flag==12)%>%
      filter(gnss_motion_flag==2)

@@ -32,7 +32,7 @@ library(stringr)
 
 setwd(paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/'))
 working_dir=(paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/'))
-domain_file=paste0(rivername,'_domain.csv')
+domain_file=paste0(rivername,'_domain_v17b.csv')
 paste0('/nas/cee-water/cjgleason/calval/Processed data/',hubname,'/')
 
 #PT paths---------
@@ -154,8 +154,7 @@ flagged_drift_output_directory='Flagged drifts/'
 #--------------------------------------------------
 
 #sword paths----------------------------------------
-SWORD_path=paste0('/nas/cee-water/cjgleason/calval/SWORD_15/netcdf/',continent,
-                  '_sword_v15.nc')
+SWORD_path=paste0('/nas/cee-water/cjgleason/data/SWORD/SWORD_v17b/netcdf/na_sword_v17b.nc')
 #------------------------------
 
 image_directory=paste0('/nas/cee-water/cjgleason/calval/cnes_watermasks/fromCNES_20230724/',rivername,'/extracteo/') 
@@ -293,14 +292,14 @@ read_keys=function(keyfile){
 ### Key file get and check ###    
 master_key= do.call(rbind,lapply(PT_key_file,read_keys))
     # key_file column names to check against (keyfile and pt_serial are added in this process, do not add to original key files)#
-key_col_names = c("PT_Serial", "Label", "Baro_Comp", "Node_ID", "Reach_ID", "US_Reach_ID", 
-                      "DS_Reach_ID", "Lat_WGS84", "Long_WGS84", "Install_method",
+key_col_names = c("PT_Serial", "Label", "Baro_Comp", "v16_node_id", "v16_reach_id", "v16_US_Reach_ID", 
+                      "v16_DS_Reach_ID", "Lat_WGS84", "Long_WGS84", "Install_method",
                       "Date_PT_Install", "Time_PT_Install_UTC", "Date_PT_Uninstall",
                       "Time_PT_Uninstall_UTC", "Date_GNSS_Install", "Time_GNSS_Install_Start_UTC", 
                       "Time_GNSS_Install_End_UTC", "GNSS_Offset_m", "Receiver_Install", "Original_Install_Log_File", 
                       "Final_Install_Log_File", "Date_GNSS_Uninstall", "Time_GNSS_Uninstall_Start_UTC", 
                       "Time_GNSS_Uninstall_End_UTC", "Receiver_Uninstall", "Original_Uninstall_Log_File", "Final_Uninstall_Log_File",
-                      "keyid", "pt_serial")
+                      "v17b_node_id", "v17b_reach_id", "v17b_US_Reach_ID", "v17b_DS_Reach_ID","keyid", "pt_serial")
 hub_key_colnames = colnames(master_key)
 
 key_check <- function(key_col_names, hub_key_colnames){
@@ -312,7 +311,7 @@ key_check <- function(key_col_names, hub_key_colnames){
                key_col_names[!key_col_names %in% hub_key_colnames],", please fix and reupload, and/or the Key file has an extra/misnamed column",
                which(is.na(match(hub_key_colnames,key_col_names))),",", hub_key_colnames[!hub_key_colnames %in% key_col_names],", please fix and reupload"))
   }
-  if(length(unique(master_key$Node_ID))<=2){stop("Check that node ID in key file did not lose precision with scientific notation, if so, fix key and reupload.")}
+  if(length(unique(master_key$v17b_node_id))<=2){stop("Check that node ID in key file did not lose precision with scientific notation, if so, fix key and reupload.")}
     else{print("Key file passes QA/QC checks")}
 }
 
@@ -391,8 +390,8 @@ lapply(pt_file_in,correct_PT_via_flyby,
   #calculate slopes and heights from drifts within nodes and reaches------
 print('starting drift dataframe creation')
 SWORD_reach= read.csv(domain_file)
-this_river_reach_IDs= as.numeric(unique(SWORD_reach$Reach_ID[!is.na(SWORD_reach$Reach_ID)]))
-this_river_node_IDs= as.numeric(unique(SWORD_reach$Node_ID[!is.na(SWORD_reach$Node_ID)]))
+this_river_reach_IDs= as.numeric(unique(SWORD_reach$v17b_reach_id[!is.na(SWORD_reach$v17b_reach_id)]))
+this_river_node_IDs= as.numeric(unique(SWORD_reach$v17b_node_id[!is.na(SWORD_reach$v17b_node_id)]))
 
 source('/nas/cee-water/cjgleason/calval_toolbox/R code/calculate_slope_wse_fromdrift.R')
 
@@ -424,8 +423,8 @@ PT_files=paste0(QA_QC_PT_flyby_output_directory,list.files(QA_QC_PT_flyby_output
 # This filters for only rivername PTs #    
 PT_files = PT_files[grepl(paste0("_", rivername, "_"), PT_files)]  
 SWORD_reach= read.csv(domain_file)
-this_river_reach_IDs= as.numeric(as.character(unique(SWORD_reach$Reach_ID)))
-this_river_node_IDs= as.numeric(unique(SWORD_reach$Node_ID[!is.na(SWORD_reach$Node_ID)]))
+this_river_reach_IDs= as.numeric(as.character(unique(SWORD_reach$v17b_reach_id)))
+this_river_node_IDs= as.numeric(unique(SWORD_reach$v17b_node_id[!is.na(SWORD_reach$v17b_node_id)]))
  
 
 # alongstream_error= 0.0001*200 #m error we get from the downstream slope of a reach in a node. This placeholder is a 1e-4 slope over a 200m node

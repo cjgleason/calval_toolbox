@@ -122,8 +122,8 @@ select_appropriate_drift=function(passname,time_threshold_sec,wse_threshold_m,di
   
   #read in key df first
   key_df=keyfile%>%
-    dplyr::select(PT_Serial,Node_ID,Reach_ID)%>%
-    transmute(pt_serial=PT_Serial,node_id=Node_ID,reach_id=Reach_ID)%>%
+    dplyr::select(PT_Serial,v17b_node_id,v17b_reach_id)%>%
+    transmute(pt_serial=PT_Serial,node_id=v17b_node_id,reach_id=v17b_reach_id)%>%
     filter(!is.na(pt_serial))
   
   
